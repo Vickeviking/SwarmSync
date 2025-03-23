@@ -1,0 +1,13 @@
+FROM rust:latest
+
+WORKDIR /app/
+
+# Install diesel CLI and cargo-watch
+RUN cargo install diesel_cli --no-default-features --features postgres
+RUN cargo install cargo-watch
+
+# Copy the entire project
+COPY . .
+
+# Set up hot reloading
+CMD ["cargo", "watch", "-x", "build"]
