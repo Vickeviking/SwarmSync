@@ -1,4 +1,10 @@
-use std::hash::Hash;
+#[derive(Debug, Clone)]
+pub enum OS {
+    Linux,
+    Windows,
+    MacOS,
+    ANY,
+}
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum SystemModule {

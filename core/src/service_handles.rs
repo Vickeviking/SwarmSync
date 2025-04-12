@@ -3,13 +3,14 @@ use crate::enums::system::CoreEvent;
 use crate::pulse_broadcaster::PulseBroadcaster;
 use crate::service_channels::ServiceChannels;
 use crate::services::{
-    dispatcher::Dispatcher, harvester::Harvester, hibernator::Hibernator, logger::Logger,
-    producer_core::ProducerCore, reciever::Reciever, scheduler::Scheduler,
-    task_archive::TaskArchive, tcp_authenticator::TCPAuthenticator,
-    transmitted_terminal::TransmittedTerminal,
+    core_bridge::CoreBridge, dispatcher::Dispatcher, harvester::Harvester, hibernator::Hibernator,
+    logger::Logger, reciever::Reciever, scheduler::Scheduler, task_archive::TaskArchive,
+    tcp_authenticator::TCPAuthenticator,
 };
 use crate::shared_resources::SharedResources;
 use std::mem;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task;
 
@@ -21,8 +22,8 @@ pub struct ServiceHandles {
     pub reciever_task: task::JoinHandle<()>,
     pub scheduler_task: task::JoinHandle<()>,
     pub tcp_authenticator_task: task::JoinHandle<()>,
-    pub transmitted_terminal_task: task::JoinHandle<()>,
-    pub producer_core_task: task::JoinHandle<()>,
+    pub core_bridge: task::JoinHandle<()>,
+    pub grpc_task: task::JoinHandle<()>,
     pub task_archive_task: task::JoinHandle<()>,
     pub db_task: task::JoinHandle<()>,
 }
@@ -66,17 +67,20 @@ impl ServiceHandles {
             service_channels.subscribe_to_core_event(),
         ));
 
-        // ====== TRANSMITTED TERMINAL ======
-        let transmitted_terminal_task: task::JoinHandle<()> =
-            task::spawn(TransmittedTerminal::init(
-                service_channels.subscribe_to_core_event(),
-                moved_tx, // Placeholder for the actual tx
-            ));
+        // ====== CORE BRIDGE ======
+        let core_bridge_instance =
+            CoreBridge::new(moved_tx, Some(pulse_broadcaster.subscribe_slow()));
+        // Arc<Mutex<CoreBridge>> shared access
+        let core_bridge_arc = Arc::new(Mutex::new(core_bridge_instance));
 
-        // ====== PRODUCER CORE ======
-        let producer_core_task: task::JoinHandle<()> = task::spawn(ProducerCore::init(
+        let init_task: task::JoinHandle<()> = tokio::spawn(CoreBridge::init(
+            Arc::clone(&core_bridge_arc),
             service_channels.subscribe_to_core_event(),
         ));
+
+        // Spawn the gRPC server, consuming the core_bridge instance
+        let grpc_task: task::JoinHandle<()> =
+            tokio::spawn(CoreBridge::start_grpc_server(Arc::clone(&core_bridge_arc)));
 
         // ====== TASK ARCHIVE ======
         let task_archive_task: task::JoinHandle<()> = task::spawn(TaskArchive::init(
@@ -95,8 +99,8 @@ impl ServiceHandles {
             reciever_task,
             scheduler_task,
             tcp_authenticator_task,
-            transmitted_terminal_task,
-            producer_core_task,
+            core_bridge: init_task,
+            grpc_task,
             task_archive_task,
             db_task,
         };
@@ -119,8 +123,8 @@ impl ServiceHandles {
             self.reciever_task,
             self.scheduler_task,
             self.tcp_authenticator_task,
-            self.transmitted_terminal_task,
-            self.producer_core_task,
+            self.core_bridge,
+            self.grpc_task,
             self.task_archive_task,
             self.db_task,
         );
