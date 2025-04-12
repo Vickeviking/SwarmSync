@@ -1,10 +1,9 @@
+pub mod core_bridge;
 pub mod dispatcher;
 pub mod harvester;
 pub mod hibernator;
 pub mod logger;
-pub mod producer_core;
 pub mod reciever;
 pub mod scheduler;
 pub mod task_archive;
 pub mod tcp_authenticator;
-pub mod transmitted_terminal;

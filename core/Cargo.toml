@@ -4,6 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+#proto buffering with gRPC 
+tonic = { workspace = true }
+prost = { workspace = true }
+tonic-build = { workspace = true }
+
 tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1.17",  features = ["sync"]}
+futures = "0.3.31"
 uuid = { version = "1.16.0", features = ["v4"]}
+cron = "0.15.0"
 chrono = "0.4"
+proto_definitions = { path = "../proto_definitions" }

@@ -38,7 +38,7 @@ impl PulseBroadcaster {
     }
 
     pub async fn start(mut self) {
-        let mut slow_interval = time::interval(Duration::from_secs(10)); // 1 minute
+        let mut slow_interval = time::interval(Duration::from_secs(10)); // 10 seconds
         let mut medium_interval = time::interval(Duration::from_secs(1)); // 1 second
         let mut fast_interval = time::interval(Duration::from_millis(50)); // 50ms
 
