@@ -1,6 +1,30 @@
-# Ignore target directory for all sub-projects
-/target/
+# Ignore target directories (Rust build artifacts)
+**/target/
 
-# Ignore debug files specifically
-/target/debug/
+# Ignore Cargo.lock (sometimes used for dependencies but can be excluded in some cases)
+Cargo.lock
+
+# Ignore meta files (ideally editor and IDE files)
+.idea/
+.vscode/
+*.iml
+
+# Ignore any local configuration files (e.g., OS-specific files)
+.DS_Store
+Thumbs.db
+
+# Ignore compiled code
+*.out
+*.dSYM/
+
+# Ignore logs
+*.log
+
+# Ignore Rust-specific directories and files
+**/*.rs.bk
+**/*.rs.bk2
+**/*.rs.bak
+
+# Ignore dependencies
+**/node_modules/
 
