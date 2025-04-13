@@ -1,0 +1,44 @@
+stages:
+  - build
+  - test
+  - deploy
+
+# This job builds the Docker containers
+build:
+  stage: build
+  services:
+    - postgres:latest
+    - redis:latest
+  script:
+    - docker-compose -f docker-compose.yml build
+  only:
+    - master # Runs only on the master branch (or any other branch you'd like)
+
+# This job runs the integration tests in the 'integration_test' service
+integration_tests:
+  stage: test
+  services:
+    - postgres:latest
+    - redis:latest
+  script:
+    - docker-compose -f docker-compose.yml run --rm integration_test
+  only:
+    - master
+
+# This job deploys Core to your Ubuntu server at home after the tests pass
+deploy:
+  stage: deploy
+  script:
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan -H vango-server.ddns.net >> ~/.ssh/known_hosts
+    - echo "Deploying Core to Ubuntu server..."
+    - ssh -o StrictHostKeyChecking=no vango@vango-server.ddns.net <<EOF
+      docker pull <your-docker-image>
+      docker-compose -f /path/to/core/docker-compose.yml up -d
+      EOF
+  only:
+    - master # Ensures this runs only on the master branch
+  when: on_success # Deploys only if tests pass
+
