@@ -3,6 +3,10 @@ name = "core"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "core"
+path = "src/main.rs"
+
 [dependencies]
 #proto buffering with gRPC 
 tonic = "0.7"
