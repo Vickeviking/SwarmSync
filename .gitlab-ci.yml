@@ -4,20 +4,16 @@ stages:
   - deploy
 
 variables:
-  SSH_HOST: "vango@83.233.229.193"
+  SSH_HOST: "vango@83.233.229.193"  # Updated from FQDN to IP
   PROJECT_PATH: "/home/vango/projects/SwarmSync"
   DOCKER_COMPOSE_FILE: "docker-compose.yml"
 
 before_script:
-  # Start the SSH agent
   - eval $(ssh-agent -s)
-  # Add the private SSH key to the agent
   - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
-  # Ensure the .ssh directory is created and properly secured
   - mkdir -p ~/.ssh
   - chmod 700 ~/.ssh
-  # Add the public key to known_hosts (for the server's identity check)
-  - ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+  - ssh-keyscan -H "${SSH_HOST#*@}" >> ~/.ssh/known_hosts  # only scan the hostname or IP, not user@host
   - chmod 600 ~/.ssh/known_hosts
 
 build:
