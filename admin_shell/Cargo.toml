@@ -2,17 +2,18 @@
 name = "admin_shell"
 version = "0.1.0"
 edition = "2021"
+[lib]
+path = "src/lib.rs"
 
 [[bin]]
-name = "test"
-path = "src/test.rs"
+name = "admin_shell"
+path = "src/main.rs"
 
 [dependencies]
 #proto with gRPC 
-tonic = { workspace = true }
-prost = { workspace = true }
-tonic-build = { workspace = true }
-tokio = { workspace = true }
-tokio-stream = { workspace = true}
+tonic = "0.7"
+prost = "0.10"
+tonic-build = "0.7"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1.17",  features = ["sync"]}
 
-proto_definitions = { path = "../proto_definitions" }

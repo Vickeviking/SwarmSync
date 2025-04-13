@@ -18,6 +18,12 @@ pub mod service_handles;
 pub mod services;
 pub mod shared_resources;
 
+//Include dynamicly from proto generated files, via ../scripts/build_proto.sh
+pub mod generated {
+    include!("generated/google.protobuf.rs");
+    include!("generated/swarm_sync.rs");
+}
+
 fn main() {
     let runtime = Runtime::new().unwrap();
     runtime.block_on(async {

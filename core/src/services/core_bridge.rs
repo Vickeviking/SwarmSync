@@ -1,13 +1,13 @@
 use crate::enums::system::{CoreEvent, Pulse};
-use crate::pulse_broadcaster::PulseBroadcaster;
-use crate::service_channels::{self, ChannelType, EventPayload};
-use crate::shared_resources::SharedResources;
-use futures::stream::Stream;
-use proto_definitions::generated::{
+use crate::generated::{
     core_bridge_service_server::CoreBridgeService,
     core_bridge_service_server::CoreBridgeServiceServer, CommandRequest, CommandResponse,
     StatusUpdate,
 };
+use crate::pulse_broadcaster::PulseBroadcaster;
+use crate::service_channels::{self, ChannelType, EventPayload};
+use crate::shared_resources::SharedResources;
+use futures::stream::Stream;
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::sync::{broadcast::Receiver, mpsc, mpsc::UnboundedSender, Mutex, Notify};

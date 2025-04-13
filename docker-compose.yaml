@@ -1,0 +1,81 @@
+services:
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    networks:
+      - backend
+
+  core:
+    build:
+      context: ./core
+      dockerfile: src/Dockerfile
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres/app_db
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./core:/app/core:rw
+    working_dir: /app/core
+    ports:
+      - "50052:50052"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nc -z localhost 50052"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 5s
+
+  admin_shell:
+    build:
+      context: ./admin_shell
+      dockerfile: src/Dockerfile
+    environment:
+      CORE_HOST: core
+      CORE_PORT: 50052
+    depends_on:
+      core:
+        condition: service_healthy
+    volumes:
+      - ./admin_shell:/app/admin_shell:rw
+    working_dir: /app/admin_shell
+    networks:
+      - backend
+
+  integration_test:
+    build:
+      context: ./admin_shell
+      dockerfile: src/dockerfile
+    command: ["cargo", "test"]
+    depends_on:
+      core:
+        condition: service_healthy
+    volumes:
+      - ./admin_shell:/app/admin_shell:rw
+    working_dir: /app/admin_shell
+    environment:
+      CORE_HOST: core
+      CORE_PORT: 50052
+    networks:
+      - backend
+
+volumes:
+  pgdata:
+
+networks:
+  backend:
+    driver: bridge
