@@ -1,17 +1,13 @@
 use crate::db::db::Db;
-use crate::enums::system::CoreEvent;
-use crate::pulse_broadcaster::PulseBroadcaster;
-use crate::service_channels::ServiceChannels;
 use crate::services::{
     core_bridge::CoreBridge, dispatcher::Dispatcher, harvester::Harvester, hibernator::Hibernator,
     logger::Logger, reciever::Reciever, scheduler::Scheduler, task_archive::TaskArchive,
     tcp_authenticator::TCPAuthenticator,
 };
 use crate::shared_resources::SharedResources;
-use std::mem;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::Notify;
 use tokio::task;
 
 pub struct ServiceHandles {
@@ -22,76 +18,71 @@ pub struct ServiceHandles {
     pub reciever_task: task::JoinHandle<()>,
     pub scheduler_task: task::JoinHandle<()>,
     pub tcp_authenticator_task: task::JoinHandle<()>,
-    pub core_bridge: task::JoinHandle<()>,
+    pub core_bridge: task::JoinHandle<Result<(), String>>,
     pub grpc_task: task::JoinHandle<()>,
     pub task_archive_task: task::JoinHandle<()>,
     pub db_task: task::JoinHandle<()>,
 }
 
 impl ServiceHandles {
-    pub fn new(
-        mut service_channels: ServiceChannels,
-        pulse_broadcaster: PulseBroadcaster,
-        shared_resources: SharedResources,
-    ) -> (Self, ServiceChannels, PulseBroadcaster, SharedResources) {
-        // Move the core_event_manip_tx out of service_channels
-        let (mut moved_tx, _) = mpsc::unbounded_channel::<CoreEvent>();
-        mem::swap(&mut moved_tx, &mut service_channels.core_event_manip_tx);
-
+    pub fn new(shared_resources: Arc<SharedResources>) -> Self {
         // ====== DISPATCHER ======
-        let dispatcher_task: task::JoinHandle<()> =
-            task::spawn(Dispatcher::init(service_channels.subscribe_to_core_event()));
+        let dispatcher: Dispatcher = Dispatcher::new(Arc::clone(&shared_resources));
+        let dispatcher_task: task::JoinHandle<()> = task::spawn(dispatcher.init());
 
         // ====== HARVESTER ======
-        let harvester_task: task::JoinHandle<()> =
-            task::spawn(Harvester::init(service_channels.subscribe_to_core_event()));
+        let harvester = Harvester::new(Arc::clone(&shared_resources));
+        let harvester_task: task::JoinHandle<()> = task::spawn(harvester.init());
 
         // ====== HIBERNATOR ======
-        let hibernator_task: task::JoinHandle<()> =
-            task::spawn(Hibernator::init(service_channels.subscribe_to_core_event()));
+        let hibernator = Hibernator::new(Arc::clone(&shared_resources));
+        let hibernator_task: task::JoinHandle<()> = task::spawn(hibernator.init());
 
         // ====== LOGGER ======
         let logger_task: task::JoinHandle<()> =
-            task::spawn(Logger::init(shared_resources.logger.clone()));
+            task::spawn(Logger::init(shared_resources.get_logger()));
 
         // ====== RECIEVER ======
-        let reciever_task: task::JoinHandle<()> =
-            task::spawn(Reciever::init(service_channels.subscribe_to_core_event()));
+        let reciever = Reciever::new(Arc::clone(&shared_resources));
+        let reciever_task: task::JoinHandle<()> = task::spawn(reciever.init());
 
         // ====== SCHEDULER ======
-        let scheduler_task: task::JoinHandle<()> =
-            task::spawn(Scheduler::init(service_channels.subscribe_to_core_event()));
+        let scheduler = Scheduler::new(Arc::clone(&shared_resources));
+        let scheduler_task: task::JoinHandle<()> = task::spawn(scheduler.init());
 
         // ====== TCP AUTHENTICATOR ======
-        let tcp_authenticator_task: task::JoinHandle<()> = task::spawn(TCPAuthenticator::init(
-            service_channels.subscribe_to_core_event(),
-        ));
+        let tcp_authenticator = TCPAuthenticator::new(Arc::clone(&shared_resources));
+        let tcp_authenticator_task: task::JoinHandle<()> = task::spawn(tcp_authenticator.init());
 
         // ====== CORE BRIDGE ======
-        let core_bridge_instance =
-            CoreBridge::new(moved_tx, Some(pulse_broadcaster.subscribe_slow()));
-        // Arc<Mutex<CoreBridge>> shared access
+        //used inside corebridge to send shutdown to gRPC server
+        let notify = Arc::new(Notify::new());
+        // Initialize the CoreBridge instance
+        let core_bridge_instance = CoreBridge::new(Arc::clone(&shared_resources));
         let core_bridge_arc = Arc::new(Mutex::new(core_bridge_instance));
 
-        let init_task: task::JoinHandle<()> = tokio::spawn(CoreBridge::init(
+        // Spawn the init task and pass notify to it
+        let init_task: task::JoinHandle<Result<(), String>> = tokio::spawn(CoreBridge::init(
+            shared_resources
+                .get_service_channels()
+                .subscribe_to_core_event(),
+            Arc::clone(&notify), // Pass notify here
+        ));
+
+        // Spawn the gRPC server task and pass notify to it
+        let grpc_task: task::JoinHandle<()> = tokio::spawn(CoreBridge::start_grpc_server(
             Arc::clone(&core_bridge_arc),
-            service_channels.subscribe_to_core_event(),
+            Arc::clone(&notify), // Pass notify here
         ));
-
-        // Spawn the gRPC server, consuming the core_bridge instance
-        let grpc_task: task::JoinHandle<()> =
-            tokio::spawn(CoreBridge::start_grpc_server(Arc::clone(&core_bridge_arc)));
-
         // ====== TASK ARCHIVE ======
-        let task_archive_task: task::JoinHandle<()> = task::spawn(TaskArchive::init(
-            service_channels.subscribe_to_core_event(),
-        ));
+        let task_archive = TaskArchive::new(Arc::clone(&shared_resources));
+        let task_archive_task: task::JoinHandle<()> = task::spawn(task_archive.init());
 
         // ====== DB ======
-        let db_task: task::JoinHandle<()> =
-            task::spawn(Db::init(service_channels.subscribe_to_core_event()));
+        let db = Db::new(Arc::clone(&shared_resources));
+        let db_task: task::JoinHandle<()> = task::spawn(db.init());
 
-        let handles = ServiceHandles {
+        ServiceHandles {
             dispatcher_task,
             harvester_task,
             hibernator_task,
@@ -103,15 +94,7 @@ impl ServiceHandles {
             grpc_task,
             task_archive_task,
             db_task,
-        };
-
-        // Return the handles and the modified service_channels
-        (
-            handles,
-            service_channels,
-            pulse_broadcaster,
-            shared_resources,
-        )
+        }
     }
 
     pub async fn join_tasks(self) {

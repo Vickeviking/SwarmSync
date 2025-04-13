@@ -1,11 +1,25 @@
-use crate::enums::system::CoreEvent;
+use crate::{enums::system::CoreEvent, shared_resources::SharedResources};
+use std::sync::Arc;
+use tokio::sync::broadcast;
 
-pub struct Reciever {}
+pub struct Reciever {
+    shared_resources: Arc<SharedResources>,
+    core_event_rx: broadcast::Receiver<CoreEvent>,
+}
 
 impl Reciever {
-    pub async fn init(mut core_event_rx: tokio::sync::broadcast::Receiver<CoreEvent>) {
+    pub fn new(shared_resources: Arc<SharedResources>) -> Self {
+        Reciever {
+            shared_resources: Arc::clone(&shared_resources),
+            core_event_rx: shared_resources
+                .get_service_channels()
+                .subscribe_to_core_event(),
+        }
+    }
+
+    pub async fn init(mut self) {
         loop {
-            match core_event_rx.recv().await {
+            match self.core_event_rx.recv().await {
                 Ok(CoreEvent::Startup) => println!("Reciever: Startup event received."),
                 Ok(CoreEvent::Restart) => println!("Reciever: Restart event received."),
                 Ok(CoreEvent::Shutdown) => {

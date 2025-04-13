@@ -1,13 +1,13 @@
 use crate::enums::system::CoreEvent::{Restart, Shutdown, Startup};
 use crate::pulse_broadcaster::PulseBroadcaster;
-use crate::service_channels::ServiceChannels;
+use crate::service_channels::{ChannelType, EventPayload, ServiceChannels, ServiceWiring};
 use crate::service_handles::ServiceHandles;
-use proto_definitions::generated::core_bridge_service_server::CoreBridgeServiceServer;
 use services::logger::Logger;
 use shared_resources::SharedResources;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 use tokio::signal;
+use tokio::sync::{mpsc, Mutex, Notify};
 
 pub mod db;
 pub mod enums;
@@ -27,21 +27,48 @@ fn main() {
 
 async fn tokio_async_runtime() {
     // All Internal Thread Communication
-    let service_channels = ServiceChannels::new();
+    // === Service channels =====
+    let service_channels = Arc::new(ServiceChannels::new()); //subscribing one, only uses ref
+    let service_wiring = Arc::new(Mutex::new(ServiceWiring::new()));
+    // === Manually push in the channels ===
+    let (corebridge_to_main_core_events_tx, corebridge_to_main_core_events_rx) =
+        mpsc::unbounded_channel::<EventPayload>();
+    {
+        // Add one-one wirings here
+        let service_wiring_lock = service_wiring.lock().await;
+
+        // Add channels to the wiring structure
+        service_wiring_lock
+            .add_channel(
+                ChannelType::CoreBridgeToMain_CoreEvents,
+                corebridge_to_main_core_events_tx,
+                corebridge_to_main_core_events_rx,
+            )
+            .await;
+    } //drops lock
+
+    //broadcasting is seperated since broadcaster async loop needs owning access
     let pulse_broadcaster = PulseBroadcaster::new(service_channels.subscribe_to_core_event());
+    let subscriptions = Arc::new(pulse_broadcaster.subscriptions());
+
+    let shutdown_notify = Arc::new(Notify::new());
 
     //=== Shared resources ===
     let logger = Arc::new(Logger::new(
         service_channels.subscribe_to_core_event(),
-        pulse_broadcaster.subscribe_slow(),
+        Arc::clone(&subscriptions),
     ));
 
-    let shared_resources: SharedResources = SharedResources::new(logger);
+    let shared_resources = Arc::new(SharedResources::new(
+        logger,
+        Arc::clone(&subscriptions),
+        Arc::clone(&service_channels),
+        Arc::clone(&service_wiring),
+    ));
 
     // takes ownership of everything, but returns when done
     //use channels and spawn all services, recieves handles to all threads
-    let (service_handles, mut service_channels, pulse_broadcaster, shared_resources) =
-        ServiceHandles::new(service_channels, pulse_broadcaster, shared_resources);
+    let service_handles = ServiceHandles::new(Arc::clone(&shared_resources));
 
     // ==== Send Startup signal to everyone =====
     service_channels.send_event_to_all_services(Startup).await;
@@ -52,23 +79,67 @@ async fn tokio_async_runtime() {
         pulse_broadcaster.start().await;
     });
 
+    // == Start ctrl-c watcher ===
+    let shutdown_notify_clone = shutdown_notify.clone();
+    tokio::spawn(async move {
+        signal::ctrl_c().await.expect("Failed to listen for ctrl-c");
+        println!("Ctrl-C detected. Triggering shutdown notify...");
+        shutdown_notify_clone.notify_one(); // Wake up select!
+    });
+
+    let core_event_manip_rx;
+    {
+        let locked_service_wiring = service_wiring.lock().await;
+        core_event_manip_rx = locked_service_wiring
+            .take_rx(ChannelType::CoreBridgeToMain_CoreEvents)
+            .await;
+    }
+
     // ==== Loop to handle incoming system manipulation events ====
-    while let Some(event) = service_channels.core_event_manip_rx.recv().await {
-        match event {
-            Shutdown => {
-                println!("Shutdown command received. Notifying all tasks...");
-                service_channels.send_event_to_all_services(Shutdown).await;
-                service_handles.join_tasks().await;
-                println!("All tasks have finished. System shutdown complete.");
-                break; // Exit the loop to shut down main
-            }
-            Restart => {
-                println!("Restart command received. Notifying all tasks...");
-                service_channels.send_event_to_all_services(Restart).await;
-            }
-            Startup => {
-                println!("Startup event received again. Ignoring...");
+    if let Some(mut rx) = core_event_manip_rx {
+        // ==== Loop to handle incoming system manipulation events ====
+        loop {
+            tokio::select! {
+                // Here, we intercept Ctrl-C (shutdown request)
+                biased;
+                _ = shutdown_notify.notified() => {
+                    println!("Notify-based shutdown triggered (e.g. Ctrl-C).");
+                    service_channels.send_event_to_all_services(Shutdown).await;
+                    service_handles.join_tasks().await;
+                    println!("Shutdown complete.");
+                    break;
+                }
+
+                // If we receive from CoreBridge a requested event, Ctrl-C has higher priority
+                maybe_event = rx.recv() => {
+                    match maybe_event {
+                        Some(EventPayload::CoreEvent(Shutdown)) => {
+                            println!("Received Shutdown event through mpsc.");
+                            service_channels.send_event_to_all_services(Shutdown).await;
+                            service_handles.join_tasks().await;
+                            println!("Shutdown complete.");
+                            break;
+                        }
+                        Some(EventPayload::CoreEvent(Restart)) => {
+                            println!("Restart command received.");
+                            service_channels.send_event_to_all_services(Restart).await;
+                        }
+                        Some(EventPayload::CoreEvent(Startup)) => {
+                            println!("Startup received again. Ignored.");
+                        }
+                        None => {
+                            println!("All senders dropped. Exiting...");
+                            break;
+                        }
+                        // Handle other events if necessary
+                        _ => {
+                            println!("Received unknown event.");
+                        }
+                    }
+                }
             }
         }
+    } else {
+        println!("Receiver not found for CoreBridgeToMain_CoreEvents.");
     }
 }
