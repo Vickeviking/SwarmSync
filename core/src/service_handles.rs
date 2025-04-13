@@ -18,71 +18,48 @@ pub struct ServiceHandles {
     pub reciever_task: task::JoinHandle<()>,
     pub scheduler_task: task::JoinHandle<()>,
     pub tcp_authenticator_task: task::JoinHandle<()>,
-    pub core_bridge: task::JoinHandle<Result<(), String>>,
+    pub core_bridge_task: task::JoinHandle<()>,
     pub grpc_task: task::JoinHandle<()>,
     pub task_archive_task: task::JoinHandle<()>,
     pub db_task: task::JoinHandle<()>,
 }
 
 impl ServiceHandles {
-    pub fn new(shared_resources: Arc<SharedResources>) -> Self {
-        // ====== DISPATCHER ======
-        let dispatcher: Dispatcher = Dispatcher::new(Arc::clone(&shared_resources));
+    // Synchronous constructor
+    pub fn new(shared_resources: Arc<SharedResources>) -> (Self, CoreBridge) {
+        // Create the dispatcher, harvester, etc., synchronously.
+        let dispatcher = Dispatcher::new(Arc::clone(&shared_resources));
         let dispatcher_task: task::JoinHandle<()> = task::spawn(dispatcher.init());
 
-        // ====== HARVESTER ======
         let harvester = Harvester::new(Arc::clone(&shared_resources));
         let harvester_task: task::JoinHandle<()> = task::spawn(harvester.init());
 
-        // ====== HIBERNATOR ======
         let hibernator = Hibernator::new(Arc::clone(&shared_resources));
         let hibernator_task: task::JoinHandle<()> = task::spawn(hibernator.init());
 
-        // ====== LOGGER ======
         let logger_task: task::JoinHandle<()> =
             task::spawn(Logger::init(shared_resources.get_logger()));
 
-        // ====== RECIEVER ======
         let reciever = Reciever::new(Arc::clone(&shared_resources));
         let reciever_task: task::JoinHandle<()> = task::spawn(reciever.init());
 
-        // ====== SCHEDULER ======
         let scheduler = Scheduler::new(Arc::clone(&shared_resources));
         let scheduler_task: task::JoinHandle<()> = task::spawn(scheduler.init());
 
-        // ====== TCP AUTHENTICATOR ======
         let tcp_authenticator = TCPAuthenticator::new(Arc::clone(&shared_resources));
         let tcp_authenticator_task: task::JoinHandle<()> = task::spawn(tcp_authenticator.init());
 
-        // ====== CORE BRIDGE ======
-        //used inside corebridge to send shutdown to gRPC server
-        let notify = Arc::new(Notify::new());
-        // Initialize the CoreBridge instance
+        // CoreBridge initialization will be handled asynchronously later
         let core_bridge_instance = CoreBridge::new(Arc::clone(&shared_resources));
-        let core_bridge_arc = Arc::new(Mutex::new(core_bridge_instance));
 
-        // Spawn the init task and pass notify to it
-        let init_task: task::JoinHandle<Result<(), String>> = tokio::spawn(CoreBridge::init(
-            shared_resources
-                .get_service_channels()
-                .subscribe_to_core_event(),
-            Arc::clone(&notify), // Pass notify here
-        ));
-
-        // Spawn the gRPC server task and pass notify to it
-        let grpc_task: task::JoinHandle<()> = tokio::spawn(CoreBridge::start_grpc_server(
-            Arc::clone(&core_bridge_arc),
-            Arc::clone(&notify), // Pass notify here
-        ));
-        // ====== TASK ARCHIVE ======
+        // Task Archive and DB initialization as well
         let task_archive = TaskArchive::new(Arc::clone(&shared_resources));
         let task_archive_task: task::JoinHandle<()> = task::spawn(task_archive.init());
 
-        // ====== DB ======
         let db = Db::new(Arc::clone(&shared_resources));
         let db_task: task::JoinHandle<()> = task::spawn(db.init());
 
-        ServiceHandles {
+        let handles = ServiceHandles {
             dispatcher_task,
             harvester_task,
             hibernator_task,
@@ -90,13 +67,47 @@ impl ServiceHandles {
             reciever_task,
             scheduler_task,
             tcp_authenticator_task,
-            core_bridge: init_task,
-            grpc_task,
+            core_bridge_task: task::spawn(async {}), //placeholder task
+            grpc_task: task::spawn(async {}),        // Placeholder task for now
             task_archive_task,
             db_task,
-        }
+        };
+        (handles, core_bridge_instance)
     }
 
+    // Async initialization method for CoreBridge
+    pub async fn initialize_core_bridge(
+        &mut self,
+        shared_resources: Arc<SharedResources>,
+        mut core_bridge: CoreBridge,
+    ) -> Result<(), String> {
+        let notify = Arc::new(Notify::new());
+
+        // Wire the channels asynchronously
+        core_bridge = core_bridge.wire_channels().await?;
+
+        let core_bridge_arc = Arc::new(Mutex::new(core_bridge));
+
+        // Start CoreBridge and gRPC server tasks
+        let core_bridge_task: task::JoinHandle<()> = tokio::spawn(CoreBridge::init(
+            shared_resources
+                .get_service_channels()
+                .subscribe_to_core_event(),
+            Arc::clone(&notify), // Pass notify here
+        ));
+
+        let grpc_task: task::JoinHandle<()> = tokio::spawn(CoreBridge::start_grpc_server(
+            Arc::clone(&core_bridge_arc),
+            Arc::clone(&notify), // Pass notify here
+        ));
+
+        self.core_bridge_task = core_bridge_task;
+        self.grpc_task = grpc_task;
+
+        Ok(())
+    }
+
+    // Join all tasks
     pub async fn join_tasks(self) {
         let _ = tokio::join!(
             self.dispatcher_task,
@@ -106,7 +117,7 @@ impl ServiceHandles {
             self.reciever_task,
             self.scheduler_task,
             self.tcp_authenticator_task,
-            self.core_bridge,
+            self.core_bridge_task,
             self.grpc_task,
             self.task_archive_task,
             self.db_task,
