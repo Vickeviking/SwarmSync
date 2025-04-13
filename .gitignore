@@ -1,1 +1,6 @@
-/target
+# Ignore target directory for all sub-projects
+/target/
+
+# Ignore debug files specifically
+/target/debug/
+
