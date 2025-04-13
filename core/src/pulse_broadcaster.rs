@@ -1,13 +1,15 @@
 use crate::enums::system::{CoreEvent, Pulse};
 use tokio::select;
 use tokio::sync::broadcast;
-use tokio::sync::{broadcast::Receiver, mpsc::UnboundedSender, Mutex};
+use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::time::{self, Duration};
 
+/// Owns the broadcast channels and emits pulses over time.
+/// Consumed and run inside one task only.
 pub struct PulseBroadcaster {
-    pub slow_tx: broadcast::Sender<Pulse>,
-    pub medium_tx: broadcast::Sender<Pulse>,
-    pub fast_tx: broadcast::Sender<Pulse>,
+    pub slow_tx: Sender<Pulse>,
+    pub medium_tx: Sender<Pulse>,
+    pub fast_tx: Sender<Pulse>,
     core_event_rx: Receiver<CoreEvent>,
 }
 
@@ -25,22 +27,19 @@ impl PulseBroadcaster {
         }
     }
 
-    pub fn subscribe_slow(&self) -> broadcast::Receiver<Pulse> {
-        self.slow_tx.subscribe()
+    pub fn subscriptions(&self) -> PulseSubscriptions {
+        PulseSubscriptions {
+            slow_tx: self.slow_tx.clone(),
+            medium_tx: self.medium_tx.clone(),
+            fast_tx: self.fast_tx.clone(),
+        }
     }
 
-    pub fn subscribe_medium(&self) -> broadcast::Receiver<Pulse> {
-        self.medium_tx.subscribe()
-    }
-
-    pub fn subscribe_fast(&self) -> broadcast::Receiver<Pulse> {
-        self.fast_tx.subscribe()
-    }
-
+    /// Starts emitting pulses on separate intervals until shutdown.
     pub async fn start(mut self) {
-        let mut slow_interval = time::interval(Duration::from_secs(10)); // 10 seconds
-        let mut medium_interval = time::interval(Duration::from_secs(1)); // 1 second
-        let mut fast_interval = time::interval(Duration::from_millis(50)); // 50ms
+        let mut slow_interval = time::interval(Duration::from_secs(10));
+        let mut medium_interval = time::interval(Duration::from_secs(1));
+        let mut fast_interval = time::interval(Duration::from_millis(50));
 
         loop {
             select! {
@@ -62,12 +61,35 @@ impl PulseBroadcaster {
                             break;
                         }
                         Err(_) => {
-                            println!("broadcast: Channel closed. Exiting...");
+                            println!("Pulse broadcast: Channel closed. Exiting...");
                             break;
                         }
                     }
                 }
             }
         }
+    }
+}
+
+/// Lightweight read-only subscription clone of the broadcaster.
+/// Can be shared freely across threads with no locking.
+#[derive(Clone)]
+pub struct PulseSubscriptions {
+    pub slow_tx: Sender<Pulse>,
+    pub medium_tx: Sender<Pulse>,
+    pub fast_tx: Sender<Pulse>,
+}
+
+impl PulseSubscriptions {
+    pub fn subscribe_slow(&self) -> Receiver<Pulse> {
+        self.slow_tx.subscribe()
+    }
+
+    pub fn subscribe_medium(&self) -> Receiver<Pulse> {
+        self.medium_tx.subscribe()
+    }
+
+    pub fn subscribe_fast(&self) -> Receiver<Pulse> {
+        self.fast_tx.subscribe()
     }
 }

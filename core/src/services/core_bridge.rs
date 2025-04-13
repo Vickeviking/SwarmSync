@@ -1,4 +1,7 @@
 use crate::enums::system::{CoreEvent, Pulse};
+use crate::pulse_broadcaster::PulseBroadcaster;
+use crate::service_channels::{self, ChannelType, EventPayload};
+use crate::shared_resources::SharedResources;
 use futures::stream::Stream;
 use proto_definitions::generated::{
     core_bridge_service_server::CoreBridgeService,
@@ -9,8 +12,7 @@ use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::signal;
-use tokio::sync::{broadcast::Receiver, mpsc::UnboundedSender, Mutex};
+use tokio::sync::{broadcast::Receiver, mpsc, mpsc::UnboundedSender, Mutex, Notify};
 use tokio_stream::{wrappers, wrappers::BroadcastStream, StreamExt};
 use tonic::{transport::Server, Request, Response, Status};
 
@@ -18,38 +20,46 @@ pub type StatusUpdateStream = Pin<Box<dyn Stream<Item = Result<StatusUpdate, Sta
 
 // CoreBridge main struct
 pub struct CoreBridge {
-    core_event_manip_tx: UnboundedSender<CoreEvent>,
-    pulse_rx: Option<Receiver<Pulse>>,
+    shared_resources: Arc<SharedResources>,
 }
 
 // CoreBridge constructor
 impl CoreBridge {
-    pub fn new(
-        core_event_manip_tx: UnboundedSender<CoreEvent>,
-        pulse_rx: Option<Receiver<Pulse>>,
-    ) -> Self {
-        Self {
-            core_event_manip_tx,
-            pulse_rx,
-        }
+    pub fn new(shared_resources: Arc<SharedResources>) -> Self {
+        CoreBridge { shared_resources }
     }
 
-    pub async fn handle_command_logic(&self, command_string: String) -> CommandResponse {
+    pub async fn handle_command_logic(
+        &self,
+        command_string: String,
+        notify: Arc<Notify>,
+    ) -> CommandResponse {
         let commands: Vec<&str> = command_string.split(',').collect();
 
         for command in commands {
             match command.trim() {
                 "STARTUP" => {
                     println!("Received STARTUP command");
-                    let _ = self.core_event_manip_tx.send(CoreEvent::Startup);
+                    self.shared_resources
+                        .get_service_channels()
+                        .send_event_to_all_services(CoreEvent::Startup)
+                        .await;
                 }
                 "RESTART" => {
                     println!("Received RESTART command");
-                    let _ = self.core_event_manip_tx.send(CoreEvent::Restart);
+                    self.shared_resources
+                        .get_service_channels()
+                        .send_event_to_all_services(CoreEvent::Restart)
+                        .await;
                 }
                 "SHUTDOWN" => {
                     println!("Received SHUTDOWN command");
-                    let _ = self.core_event_manip_tx.send(CoreEvent::Shutdown);
+                    self.shared_resources
+                        .get_service_channels()
+                        .send_event_to_all_services(CoreEvent::Shutdown)
+                        .await;
+                    // Trigger shutdown notify
+                    notify.notify_one();
                 }
                 _ => {
                     println!("Unknown command: {}", command);
@@ -64,11 +74,13 @@ impl CoreBridge {
     }
 
     pub fn generate_status_stream(&mut self) -> Result<StatusUpdateStream, Status> {
+        // Take the receiver and ensure it's valid
         let rx = self
-            .pulse_rx
-            .take()
-            .ok_or_else(|| Status::internal("pulse_rx already consumed or not initialized"))?;
+            .shared_resources
+            .get_pulse_subscriptions()
+            .subscribe_medium();
 
+        // Create a new stream from the receiver
         let stream = BroadcastStream::new(rx).filter_map(|result| match result {
             Ok(_) | Err(wrappers::errors::BroadcastStreamRecvError::Lagged(_)) => {
                 Some(Ok(StatusUpdate {
@@ -78,29 +90,23 @@ impl CoreBridge {
             }
         });
 
+        // Return the stream wrapped in a Box
         Ok(Box::pin(stream))
     }
 
-    pub async fn init(core_bridge: Arc<Mutex<Self>>, mut core_event_rx: Receiver<CoreEvent>) {
-        let listener = TcpListener::bind("0.0.0.0:5106")
-            .await
-            .expect("Failed to bind port");
-        let active_users = Arc::new(Mutex::new(HashMap::new()));
-
+    pub async fn init(
+        mut core_event_rx: Receiver<CoreEvent>,
+        notify: Arc<Notify>,
+    ) -> Result<(), String> {
+        // Main loop to listen for events
         loop {
             tokio::select! {
-                Ok((socket, addr)) = listener.accept() => {
-                    println!("New connection from: {}", addr);
-                    let users = Arc::clone(&active_users);
-                    let core_event_tx = core_bridge.lock().await.core_event_manip_tx.clone();
-                    tokio::spawn(Self::handle_client(socket, addr.to_string(), users, core_event_tx));
-                },
-
                 event = core_event_rx.recv() => {
                     match event {
                         Ok(CoreEvent::Startup) => println!("CoreBridge Startup event received."),
                         Ok(CoreEvent::Restart) => println!("CoreBridge Restart event received."),
                         Ok(CoreEvent::Shutdown) => {
+                            notify.notify_one();
                             println!("CoreBridge Shutdown event received. Stopping...");
                             break;
                         }
@@ -112,43 +118,19 @@ impl CoreBridge {
                 }
             }
         }
+
+        Ok(())
     }
 
-    async fn handle_client(
-        _socket: TcpStream,
-        _addr: String,
-        _active_users: Arc<Mutex<HashMap<String, String>>>,
-        core_event_tx: UnboundedSender<CoreEvent>,
-    ) {
-        let command = "STARTUP,RESTART";
-        let commands: Vec<&str> = command.split(',').collect();
-
-        for cmd in commands {
-            match cmd.trim() {
-                "STARTUP" => {
-                    let _ = core_event_tx.send(CoreEvent::Startup);
-                }
-                "RESTART" => {
-                    let _ = core_event_tx.send(CoreEvent::Restart);
-                }
-                "SHUTDOWN" => {
-                    let _ = core_event_tx.send(CoreEvent::Shutdown);
-                }
-                _ => {
-                    println!("Unknown command: {}", cmd);
-                }
-            }
-        }
-    }
-
-    pub async fn start_grpc_server(core_bridge: Arc<Mutex<Self>>) {
-        let addr = "[::1]:50051".parse().unwrap();
+    pub async fn start_grpc_server(core_bridge: Arc<Mutex<Self>>, notify: Arc<Notify>) {
+        let addr = "0.0.0.0:50052".parse().unwrap();
 
         let server = Server::builder()
             .add_service(CoreBridgeServiceServer::new(CoreBridgeGrpcWrapper(
                 core_bridge.clone(),
+                notify.clone(),
             )))
-            .serve_with_shutdown(addr, shutdown_signal(Arc::clone(&core_bridge)));
+            .serve_with_shutdown(addr, shutdown_signal(notify.clone()));
 
         println!("gRPC server started at {:?}", addr);
 
@@ -163,7 +145,7 @@ impl CoreBridge {
 
 // gRPC-safe wrapper around CoreBridge
 #[derive(Clone)]
-pub struct CoreBridgeGrpcWrapper(pub Arc<Mutex<CoreBridge>>);
+pub struct CoreBridgeGrpcWrapper(pub Arc<Mutex<CoreBridge>>, pub Arc<Notify>);
 
 #[tonic::async_trait]
 impl CoreBridgeService for CoreBridgeGrpcWrapper {
@@ -176,7 +158,9 @@ impl CoreBridgeService for CoreBridgeGrpcWrapper {
     ) -> Result<Response<CommandResponse>, Status> {
         let command_string = request.into_inner().command;
         let inner = self.0.lock().await;
-        let response = inner.handle_command_logic(command_string).await;
+        let response = inner
+            .handle_command_logic(command_string, self.1.clone())
+            .await;
         Ok(Response::new(response))
     }
 
@@ -190,15 +174,7 @@ impl CoreBridgeService for CoreBridgeGrpcWrapper {
     }
 }
 
-// Shutdown signal that you can call when you need to stop the server
-async fn shutdown_signal(core_bridge: Arc<Mutex<CoreBridge>>) {
-    signal::ctrl_c().await.unwrap();
-    println!("Shutdown signal received. Stopping server...");
-
-    // Lock CoreBridge to send shutdown event through the tx channel
-    let inner = core_bridge.lock().await;
-
-    // Send the shutdown event over the channel
-    inner.core_event_manip_tx.send(CoreEvent::Shutdown).unwrap();
-    println!("Shutdown event sent to CoreBridge.");
+async fn shutdown_signal(notify: Arc<Notify>) {
+    notify.notified().await; // Wait for the shutdown notification
+    println!("Shutdown signal received. Stopping gRPC server...");
 }

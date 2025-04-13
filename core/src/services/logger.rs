@@ -1,4 +1,6 @@
 use crate::enums::system::{CoreEvent, Pulse, SystemModule};
+use crate::pulse_broadcaster::PulseBroadcaster;
+use crate::pulse_broadcaster::PulseSubscriptions;
 use chrono::{DateTime, Utc};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
@@ -53,7 +55,12 @@ pub struct LogEntry {
 }
 
 impl Logger {
-    pub fn new(core_event_rx: Receiver<CoreEvent>, pulse_rx: Receiver<Pulse>) -> Self {
+    pub fn new(
+        core_event_rx: Receiver<CoreEvent>,
+        pulse_subscriptions: Arc<PulseSubscriptions>,
+    ) -> Self {
+        let pulse_rx = pulse_subscriptions.subscribe_slow();
+
         Logger {
             logs: RwLock::new(HashMap::new()),
             module_logs: RwLock::new(HashMap::new()),
