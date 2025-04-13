@@ -3,5 +3,16 @@ name = "admin_shell"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "test"
+path = "src/test.rs"
+
 [dependencies]
-tokio = { version = "1", features = ["full"] }
+#proto with gRPC 
+tonic = { workspace = true }
+prost = { workspace = true }
+tonic-build = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true}
+
+proto_definitions = { path = "../proto_definitions" }
