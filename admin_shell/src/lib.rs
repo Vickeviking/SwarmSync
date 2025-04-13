@@ -3,5 +3,5 @@ pub mod generated {
     include!("generated/swarm_sync.rs");
 }
 
-// You can optionally move test_grpc_connection here if you want to keep CLI and tests DRY
+pub mod background;
 pub mod grpc;

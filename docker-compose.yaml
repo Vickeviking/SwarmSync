@@ -40,26 +40,10 @@ services:
       retries: 15
       start_period: 5s
 
-  admin_shell:
-    build:
-      context: ./admin_shell
-      dockerfile: src/Dockerfile
-    environment:
-      CORE_HOST: core
-      CORE_PORT: 50052
-    depends_on:
-      core:
-        condition: service_healthy
-    volumes:
-      - ./admin_shell:/app/admin_shell:rw
-    working_dir: /app/admin_shell
-    networks:
-      - backend
-
   integration_test:
     build:
       context: ./admin_shell
-      dockerfile: src/dockerfile
+      dockerfile: src/Dockerfile
     command: ["cargo", "test"]
     depends_on:
       core:

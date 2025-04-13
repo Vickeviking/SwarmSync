@@ -1,7 +1,6 @@
-# Build stage
-FROM rust:latest AS builder
+FROM rust:latest
 
-# Install build dependencies (only needed during build)
+# Install build + runtime dependencies
 RUN apt-get update && apt-get install -y \
   cmake \
   build-essential \
@@ -10,49 +9,16 @@ RUN apt-get update && apt-get install -y \
   netcat-openbsd \
   && rm -rf /var/lib/apt/lists/*
 
-# Set workspace root
+
 WORKDIR /app
 
-# Copy the Cargo.toml and Cargo.lock files first to leverage Docker layer caching for dependencies
-COPY Cargo.toml Cargo.lock ./
-
-# Copy the rest of the project files (e.g., source code, config files, etc.)
 COPY . .
 
-# Build the project
-RUN cargo build --release
-
-# Final stage (runtime stage)
-FROM rust:latest
-
-# Install runtime dependencies (for running the app and Nectar)
-RUN apt-get update && apt-get install -y \
-  libssl-dev \
-  netcat-openbsd \
-  && rm -rf /var/lib/apt/lists/*
-
-# Set workspace root
-WORKDIR /app
-
-# Ensure the directory exists before copying
-RUN mkdir -p /app/core
-
-# Copy the compiled artifacts from the builder stage (i.e., the built project and Nectar)
-COPY --from=builder /app/target/release/core /app/core
-
-# Copy the rest of the project files (e.g., config files, if any)
-COPY . .
-
-# Install cargo-watch (dev tool)
+RUN cargo install diesel_cli --no-default-features --features postgres
 RUN cargo install cargo-watch
 
-# Set working directory to the core folder for dev runs
 WORKDIR /app/core
 
-# Debugging step: Print directory structure to ensure everything is correct
-RUN ls -l /app
-
-# Default dev command to watch and run
 CMD ["cargo", "watch", "-x", "run --bin core"]
 
 

@@ -1,7 +1,6 @@
-# Build stage
-FROM rust:latest AS builder
+FROM rust:latest
 
-# Install build dependencies (only needed during build)
+# Install build dependencies, including netcat
 RUN apt-get update && apt-get install -y \
   cmake \
   build-essential \
@@ -13,48 +12,13 @@ RUN apt-get update && apt-get install -y \
 # Set workspace root
 WORKDIR /app
 
-# Copy the Cargo.toml and Cargo.lock files first to cache dependencies
-COPY Cargo.toml Cargo.lock ./
-
-# Copy the rest of the project files
+# Copy the entire workspace into the container
 COPY . .
 
-# Install dependencies for the Rust project (this step will be cached)
-RUN cargo build --release --locked
-RUN cargo install cargo-watch
-
-# Final stage (runtime stage)
-FROM rust:latest
-
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-  libssl-dev \
-  netcat-openbsd \
-  && rm -rf /var/lib/apt/lists/*
-
-# Set workspace root
-WORKDIR /app
-
-# Ensure the admin_shell directory exists
-RUN mkdir -p /app/admin_shell
-
-# Copy only the compiled artifacts from the builder stage
-COPY --from=builder /app/target/release/admin_shell /app/admin_shell
-
-# Install cargo-watch (dev tool)
-RUN cargo install cargo-watch
-
-# Copy only necessary files for runtime (e.g., config files, if any)
-COPY --from=builder /app/Cargo.toml /app/Cargo.lock ./
-
-# Set working directory to the admin_shell folder for dev runs
+# Switch to admin_shell folder for dev runs
 WORKDIR /app/admin_shell
 
 # Default dev command to watch and run
-CMD ["cargo", "watch", "-x", "run"]
-
-
-
-
+CMD ["cargo", "test", "--all"]
 
 
