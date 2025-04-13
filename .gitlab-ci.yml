@@ -4,7 +4,7 @@ stages:
   - deploy
 
 variables:
-  SSH_HOST: "vango@83.233.229.193"
+  SSH_HOST: "vango@83.233.228.244"
   PROJECT_PATH: "/home/vango/projects/SwarmSync"
   DOCKER_COMPOSE_FILE: "docker-compose.yml"
 
@@ -14,8 +14,7 @@ before_script:
   - mkdir -p ~/.ssh
   - chmod 700 ~/.ssh
   - echo "Doing ssh-keyscan..."
-  - ssh-keyscan -H 83.233.229.193 >> ~/.ssh/known_hosts
-  - echo "ssh-keyscan done"
+  - ssh-keyscan -H 83.233.228.244 >> ~/.ssh/known_hosts
   - chmod 600 ~/.ssh/known_hosts
 
 build:
