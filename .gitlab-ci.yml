@@ -14,7 +14,7 @@ before_script:
   - mkdir -p ~/.ssh
   - chmod 700 ~/.ssh
   - echo "Doing ssh-keyscan..."
-  - bash -c 'ssh-keyscan -H "${1#*@}"' _ "$SSH_HOST" >> ~/.ssh/known_hosts
+  - ssh-keyscan -H 83.233.229.193 >> ~/.ssh/known_hosts
   - echo "ssh-keyscan done"
   - chmod 600 ~/.ssh/known_hosts
 
