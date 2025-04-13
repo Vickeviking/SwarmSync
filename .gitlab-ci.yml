@@ -4,7 +4,7 @@ stages:
   - deploy
 
 variables:
-  SSH_HOST: "vango@vango-server.ddns.net"
+  SSH_HOST: "vango@83.233.229.193"
   PROJECT_PATH: "/home/vango/projects/SwarmSync"
   DOCKER_COMPOSE_FILE: "docker-compose.yml"
 
