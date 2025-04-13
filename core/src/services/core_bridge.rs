@@ -8,10 +8,8 @@ use proto_definitions::generated::{
     core_bridge_service_server::CoreBridgeServiceServer, CommandRequest, CommandResponse,
     StatusUpdate,
 };
-use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
-use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast::Receiver, mpsc, mpsc::UnboundedSender, Mutex, Notify};
 use tokio_stream::{wrappers, wrappers::BroadcastStream, StreamExt};
 use tonic::{transport::Server, Request, Response, Status};
@@ -21,12 +19,16 @@ pub type StatusUpdateStream = Pin<Box<dyn Stream<Item = Result<StatusUpdate, Sta
 // CoreBridge main struct
 pub struct CoreBridge {
     shared_resources: Arc<SharedResources>,
+    core_bridge_to_main_core_event_tx: Option<UnboundedSender<EventPayload>>,
 }
 
 // CoreBridge constructor
 impl CoreBridge {
     pub fn new(shared_resources: Arc<SharedResources>) -> Self {
-        CoreBridge { shared_resources }
+        CoreBridge {
+            shared_resources,
+            core_bridge_to_main_core_event_tx: None,
+        }
     }
 
     pub async fn handle_command_logic(
@@ -40,24 +42,39 @@ impl CoreBridge {
             match command.trim() {
                 "STARTUP" => {
                     println!("Received STARTUP command");
-                    self.shared_resources
-                        .get_service_channels()
-                        .send_event_to_all_services(CoreEvent::Startup)
-                        .await;
+                    if let Some(tx) = &self.core_bridge_to_main_core_event_tx {
+                        let _ = tx.send(EventPayload::CoreEvent(CoreEvent::Startup));
+                    } else {
+                        return CommandResponse {
+                            status: "error".into(),
+                            result: "core_bridge_to_main_core_event_tx not bound in CoreBridge"
+                                .into(),
+                        };
+                    }
                 }
                 "RESTART" => {
                     println!("Received RESTART command");
-                    self.shared_resources
-                        .get_service_channels()
-                        .send_event_to_all_services(CoreEvent::Restart)
-                        .await;
+                    if let Some(tx) = &self.core_bridge_to_main_core_event_tx {
+                        let _ = tx.send(EventPayload::CoreEvent(CoreEvent::Restart));
+                    } else {
+                        return CommandResponse {
+                            status: "error".into(),
+                            result: "core_bridge_to_main_core_event_tx not bound in CoreBridge"
+                                .into(),
+                        };
+                    }
                 }
                 "SHUTDOWN" => {
                     println!("Received SHUTDOWN command");
-                    self.shared_resources
-                        .get_service_channels()
-                        .send_event_to_all_services(CoreEvent::Shutdown)
-                        .await;
+                    if let Some(tx) = &self.core_bridge_to_main_core_event_tx {
+                        let _ = tx.send(EventPayload::CoreEvent(CoreEvent::Shutdown));
+                    } else {
+                        return CommandResponse {
+                            status: "error".into(),
+                            result: "core_bridge_to_main_core_event_tx not bound in CoreBridge"
+                                .into(),
+                        };
+                    }
                     // Trigger shutdown notify
                     notify.notify_one();
                 }
@@ -94,10 +111,26 @@ impl CoreBridge {
         Ok(Box::pin(stream))
     }
 
-    pub async fn init(
-        mut core_event_rx: Receiver<CoreEvent>,
-        notify: Arc<Notify>,
-    ) -> Result<(), String> {
+    pub async fn wire_channels(mut self) -> Result<Self, String> {
+        // Critical section, we take core_bridge_to_main_core_event_tx here!
+        {
+            let service_wiring = self.shared_resources.get_service_wiring();
+            let locked_service_wiring = service_wiring.lock().await;
+            self.core_bridge_to_main_core_event_tx = locked_service_wiring
+                .take_tx(ChannelType::CoreBridgeToMain_CoreEvents)
+                .await;
+
+            //check that core_bridge_to_main_core_event_tx is Some, otherwise throw error
+            if self.core_bridge_to_main_core_event_tx.is_none() {
+                return Err(
+                    "CoreBridge wiring failed: Missing CoreBridgeToMain_CoreEvents TX".into(),
+                );
+            }
+        }
+        Ok(self)
+    }
+
+    pub async fn init(mut core_event_rx: Receiver<CoreEvent>, notify: Arc<Notify>) {
         // Main loop to listen for events
         loop {
             tokio::select! {
@@ -118,8 +151,6 @@ impl CoreBridge {
                 }
             }
         }
-
-        Ok(())
     }
 
     pub async fn start_grpc_server(core_bridge: Arc<Mutex<Self>>, notify: Arc<Notify>) {

@@ -68,7 +68,11 @@ async fn tokio_async_runtime() {
 
     // takes ownership of everything, but returns when done
     //use channels and spawn all services, recieves handles to all threads
-    let service_handles = ServiceHandles::new(Arc::clone(&shared_resources));
+    let (mut service_handles, core_bridge) = ServiceHandles::new(Arc::clone(&shared_resources));
+    service_handles
+        .initialize_core_bridge(Arc::clone(&shared_resources), core_bridge)
+        .await
+        .unwrap();
 
     // ==== Send Startup signal to everyone =====
     service_channels.send_event_to_all_services(Startup).await;
@@ -87,13 +91,28 @@ async fn tokio_async_runtime() {
         shutdown_notify_clone.notify_one(); // Wake up select!
     });
 
-    let core_event_manip_rx;
-    {
+    let core_event_manip_rx = {
         let locked_service_wiring = service_wiring.lock().await;
-        core_event_manip_rx = locked_service_wiring
-            .take_rx(ChannelType::CoreBridgeToMain_CoreEvents)
-            .await;
-    }
+
+        if locked_service_wiring
+            .rx_exists(ChannelType::CoreBridgeToMain_CoreEvents)
+            .await
+        {
+            let rx = locked_service_wiring
+                .take_rx(ChannelType::CoreBridgeToMain_CoreEvents)
+                .await;
+
+            // Clean up the channel if both ends are now gone
+            locked_service_wiring
+                .remove_if_empty(ChannelType::CoreBridgeToMain_CoreEvents)
+                .await;
+
+            rx
+        } else {
+            println!("[warn] Receiver does not exist for CoreBridgeToMain_CoreEvents.");
+            None
+        }
+    };
 
     // ==== Loop to handle incoming system manipulation events ====
     if let Some(mut rx) = core_event_manip_rx {
