@@ -9,12 +9,16 @@ variables:
   DOCKER_COMPOSE_FILE: "docker-compose.yml"
 
 before_script:
-  - "which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )"
+  # Start the SSH agent
   - eval $(ssh-agent -s)
+  # Add the private SSH key to the agent
   - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+  # Ensure the .ssh directory is created and properly secured
   - mkdir -p ~/.ssh
   - chmod 700 ~/.ssh
-  - ssh-keyscan -H vango-server.ddns.net >> ~/.ssh/known_hosts
+  # Add the public key to known_hosts (for the server's identity check)
+  - ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+  - chmod 600 ~/.ssh/known_hosts
 
 build:
   stage: build
