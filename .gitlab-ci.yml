@@ -3,42 +3,50 @@ stages:
   - test
   - deploy
 
-# This job builds the Docker containers
+variables:
+  SSH_HOST: "vango@vango-server.ddns.net"
+  PROJECT_PATH: "/home/vango/projects/SwarmSync"
+  DOCKER_COMPOSE_FILE: "docker-compose.yml"
+
+before_script:
+  - "which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )"
+  - eval $(ssh-agent -s)
+  - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+  - mkdir -p ~/.ssh
+  - chmod 700 ~/.ssh
+  - ssh-keyscan -H vango-server.ddns.net >> ~/.ssh/known_hosts
+
 build:
   stage: build
-  services:
-    - postgres:latest
-    - redis:latest
   script:
-    - docker-compose -f docker-compose.yml build
-  only:
-    - master # Runs only on the master branch (or any other branch you'd like)
-
-# This job runs the integration tests in the 'integration_test' service
-integration_tests:
-  stage: test
-  services:
-    - postgres:latest
-    - redis:latest
-  script:
-    - docker-compose -f docker-compose.yml run --rm integration_test
+    - echo "Triggering build on Ubuntu server..."
+    - ssh "$SSH_HOST" <<EOF
+      cd $PROJECT_PATH
+      git pull origin master
+      docker-compose -f $DOCKER_COMPOSE_FILE build
+      EOF
   only:
     - master
 
-# This job deploys Core to your Ubuntu server at home after the tests pass
+integration_tests:
+  stage: test
+  script:
+    - echo "Running integration tests on Ubuntu server..."
+    - ssh "$SSH_HOST" <<EOF
+      cd $PROJECT_PATH
+      docker-compose -f $DOCKER_COMPOSE_FILE run --rm integration_test
+      EOF
+  only:
+    - master
+
 deploy:
   stage: deploy
   script:
-    - mkdir -p ~/.ssh
-    - echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - ssh-keyscan -H vango-server.ddns.net >> ~/.ssh/known_hosts
     - echo "Deploying Core to Ubuntu server..."
-    - ssh -o StrictHostKeyChecking=no vango@vango-server.ddns.net <<EOF
-      docker pull <your-docker-image>
-      docker-compose -f /path/to/core/docker-compose.yml up -d
+    - ssh "$SSH_HOST" <<EOF
+      cd $PROJECT_PATH
+      docker-compose -f $DOCKER_COMPOSE_FILE up -d core
       EOF
   only:
-    - master # Ensures this runs only on the master branch
-  when: on_success # Deploys only if tests pass
-
+    - master
+  when: on_success
