@@ -1,3 +1,5 @@
+#TODO: Rewrite as paris does, check udemy
+
 services:
   postgres:
     image: postgres:latest
@@ -39,23 +41,6 @@ services:
       timeout: 2s
       retries: 15
       start_period: 5s
-
-  integration_test:
-    build:
-      context: ./admin_shell
-      dockerfile: src/Dockerfile
-    command: ["cargo", "test"]
-    depends_on:
-      core:
-        condition: service_healthy
-    volumes:
-      - ./admin_shell:/app/admin_shell:rw
-    working_dir: /app/admin_shell
-    environment:
-      CORE_HOST: core
-      CORE_PORT: 50052
-    networks:
-      - backend
 
 volumes:
   pgdata:
