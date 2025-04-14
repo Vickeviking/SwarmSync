@@ -5,7 +5,7 @@ use tokio::sync::{broadcast, mpsc, RwLock};
 /// Enum for different one-to-one channel types.
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub enum ChannelType {
-    CoreBridgeToMain_CoreEvents,
+    CoreBridgeToMain_CoreEvents, //WARNING: not used either, used for mpsc not yet used
     CoreBridgeToMain_Notification, // not used just example showing that multiple can be added
 }
 
@@ -15,8 +15,6 @@ pub enum EventPayload {
     CoreEvent(CoreEvent),
     NotificationEvent(NotificationEvent),
 }
-
-//WARNING: here is how to add payload
 
 //Example on how to add payload
 #[derive(Debug, Clone)]
@@ -69,6 +67,8 @@ type ChannelPair = (
 
 /// ServiceWiring encapsulates the one-to-one communication channels between modules.
 /// This structure manages each channel identified by `ChannelType`.
+//WARNING: Really usefull but sadly not yet implemented, this is how mpsc is used, please read docs
+//in notion
 pub struct ServiceWiring {
     inner: RwLock<HashMap<ChannelType, ChannelPair>>,
 }
@@ -149,6 +149,7 @@ impl Default for ServiceWiring {
     }
 }
 
+//Perfect example of how to use mpsc with service_channels
 #[tokio::test]
 async fn test_service_wiring() {
     let wiring = ServiceWiring::new();

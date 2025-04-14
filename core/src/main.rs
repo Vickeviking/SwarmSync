@@ -9,7 +9,6 @@ use tokio::runtime::Runtime;
 use tokio::signal;
 use tokio::sync::{mpsc, Mutex, Notify};
 
-pub mod db;
 pub mod enums;
 pub mod models;
 pub mod pulse_broadcaster;
@@ -17,12 +16,6 @@ pub mod service_channels;
 pub mod service_handles;
 pub mod services;
 pub mod shared_resources;
-
-//Include dynamicly from proto generated files, via ../scripts/build_proto.sh
-pub mod generated {
-    include!("generated/google.protobuf.rs");
-    include!("generated/swarm_sync.rs");
-}
 
 fn main() {
     let runtime = Runtime::new().unwrap();
@@ -37,6 +30,8 @@ async fn tokio_async_runtime() {
     let service_channels = Arc::new(ServiceChannels::new()); //subscribing one, only uses ref
     let service_wiring = Arc::new(Mutex::new(ServiceWiring::new()));
     // === Manually push in the channels ===
+
+    /*      EXAMPLE of pushing in a mpsc channel between 2 modules
     let (corebridge_to_main_core_events_tx, corebridge_to_main_core_events_rx) =
         mpsc::unbounded_channel::<EventPayload>();
     {
@@ -52,6 +47,7 @@ async fn tokio_async_runtime() {
             )
             .await;
     } //drops lock
+    */
 
     //broadcasting is seperated since broadcaster async loop needs owning access
     let pulse_broadcaster = PulseBroadcaster::new(service_channels.subscribe_to_core_event());
@@ -74,11 +70,7 @@ async fn tokio_async_runtime() {
 
     // takes ownership of everything, but returns when done
     //use channels and spawn all services, recieves handles to all threads
-    let (mut service_handles, core_bridge) = ServiceHandles::new(Arc::clone(&shared_resources));
-    service_handles
-        .initialize_core_bridge(Arc::clone(&shared_resources), core_bridge)
-        .await
-        .unwrap();
+    let service_handles = ServiceHandles::new(Arc::clone(&shared_resources));
 
     // ==== Send Startup signal to everyone =====
     service_channels.send_event_to_all_services(Startup).await;
@@ -97,74 +89,17 @@ async fn tokio_async_runtime() {
         shutdown_notify_clone.notify_one(); // Wake up select!
     });
 
-    let core_event_manip_rx = {
-        let locked_service_wiring = service_wiring.lock().await;
-
-        if locked_service_wiring
-            .rx_exists(ChannelType::CoreBridgeToMain_CoreEvents)
-            .await
-        {
-            let rx = locked_service_wiring
-                .take_rx(ChannelType::CoreBridgeToMain_CoreEvents)
-                .await;
-
-            // Clean up the channel if both ends are now gone
-            locked_service_wiring
-                .remove_if_empty(ChannelType::CoreBridgeToMain_CoreEvents)
-                .await;
-
-            rx
-        } else {
-            println!("[warn] Receiver does not exist for CoreBridgeToMain_CoreEvents.");
-            None
-        }
-    };
-
     // ==== Loop to handle incoming system manipulation events ====
-    if let Some(mut rx) = core_event_manip_rx {
-        // ==== Loop to handle incoming system manipulation events ====
-        loop {
-            tokio::select! {
-                // Here, we intercept Ctrl-C (shutdown request)
-                biased;
-                _ = shutdown_notify.notified() => {
-                    println!("Notify-based shutdown triggered (e.g. Ctrl-C).");
-                    service_channels.send_event_to_all_services(Shutdown).await;
-                    service_handles.join_tasks().await;
-                    println!("Shutdown complete.");
-                    break;
-                }
-
-                // If we receive from CoreBridge a requested event, Ctrl-C has higher priority
-                maybe_event = rx.recv() => {
-                    match maybe_event {
-                        Some(EventPayload::CoreEvent(Shutdown)) => {
-                            println!("Received Shutdown event through mpsc.");
-                            service_channels.send_event_to_all_services(Shutdown).await;
-                            service_handles.join_tasks().await;
-                            println!("Shutdown complete.");
-                            break;
-                        }
-                        Some(EventPayload::CoreEvent(Restart)) => {
-                            println!("Restart command received.");
-                            service_channels.send_event_to_all_services(Restart).await;
-                        }
-                        Some(EventPayload::CoreEvent(Startup)) => {
-                            println!("Startup received again. Ignored.");
-                        }
-                        None => {
-                            println!("All senders dropped. Exiting...");
-                            break;
-                        }
-                        // Handle other events if necessary
-                        _ => {
-                            println!("Received unknown event.");
-                        }
-                    }
-                }
+    loop {
+        tokio::select! {
+            // Here, we intercept Ctrl-C (shutdown request)
+            _ = shutdown_notify.notified() => {
+                println!("Notify-based shutdown triggered (e.g. Ctrl-C).");
+                service_channels.send_event_to_all_services(Shutdown).await;
+                service_handles.join_tasks().await;
+                println!("Shutdown complete.");
+                break;
             }
         }
-    } else {
-        println!("Receiver not found for CoreBridgeToMain_CoreEvents.");
     }
 }
