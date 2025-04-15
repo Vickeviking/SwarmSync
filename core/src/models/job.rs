@@ -1,27 +1,119 @@
-use crate::enums::auth::HashAlgorithm;
-use crate::enums::job::{FetchStyle, JobSchedule, OutputType};
+use std::io::Write;
+use std::str::FromStr;
 
-#[derive(Debug, Clone)]
-pub struct Checksum {
-    checksum: Option<String>, // Optional SHA-256 or similar for file validation
-    hash_algorithm: Option<HashAlgorithm>, // Consumer-specified hash algorithm for file verification
+use crate::schema::*;
+use chrono::NaiveDateTime;
+use diesel::deserialize::FromSql;
+use diesel::expression::AsExpression;
+use diesel::pg::{Pg, PgValue};
+use diesel::serialize::ToSql;
+use diesel::sql_types::Text;
+use diesel::{deserialize::FromSqlRow, prelude::*};
+use serde::{Deserialize, Serialize};
+
+use crate::enums::{
+    image_format::ImageFormatEnum, job::JobStateEnum, output::OutputTypeEnum,
+    schedule::ScheduleTypeEnum,
+};
+use crate::models::{admin::Admin, worker::Worker};
+use crate::schema::*;
+
+#[derive(
+    Debug, Serialize, Deserialize, diesel::Queryable, Identifiable, Associations, AsChangeset,
+)]
+#[diesel(belongs_to(Admin))] // FK: admin_id
+pub struct Job {
+    pub id: i32,
+    pub admin_id: i32,
+    pub job_name: String,
+    pub image_url: String,
+    pub image_format: ImageFormatEnum,
+    pub docker_flags: Option<Vec<Option<String>>>,
+    pub output_type: OutputTypeEnum,
+    pub output_paths: Option<Vec<Option<String>>>,
+    pub schedule_type: ScheduleTypeEnum,
+    pub cron_expression: Option<String>,
+    pub notes: Option<String>,
+    pub state: JobStateEnum,
+    pub error_message: Option<String>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
 }
 
-#[derive(Debug, Clone)]
-pub enum ImageFormat {
-    Tarball,        // Direct tarball download (.tar, .gz)
-    DockerRegistry, // Pull using `docker pull`
+#[derive(Debug, Insertable)]
+#[diesel(table_name = jobs)]
+pub struct NewJob {
+    pub admin_id: i32,
+    pub job_name: String,
+    pub image_url: String,
+    pub image_format: ImageFormatEnum,
+    pub docker_flags: Option<Vec<Option<String>>>,
+    pub output_type: OutputTypeEnum,
+    pub output_paths: Option<Vec<Option<String>>>,
+    pub schedule_type: ScheduleTypeEnum,
+    pub cron_expression: Option<String>,
+    pub notes: Option<String>,
 }
 
-#[derive(Debug, Clone)]
-pub struct JobPayload {
-    job_name: String,
-    image_url: String,
-    image_format: ImageFormat,
-    docker_flags: Option<Vec<String>>, // e.g., ["--env", "FOO=bar"]
-    output: OutputType,                // How to retrieve result
-    fetch_style: FetchStyle,           // Pull or Push result
-    schedule: JobSchedule,             // When to run
-    checksum: Checksum,                // Optional file hash
-    notes: Option<String>,             // Optional metadata
+#[derive(Debug, Serialize, Deserialize, Queryable, Identifiable, Associations)]
+#[diesel(belongs_to(Job))] // FK: job_id
+#[diesel(belongs_to(Worker))] // FK: worker_id
+pub struct JobAssignment {
+    pub id: i32,
+    pub job_id: i32,
+    pub worker_id: i32,
+    pub assigned_at: NaiveDateTime,
+    pub started_at: Option<NaiveDateTime>,
+    pub finished_at: Option<NaiveDateTime>,
+}
+
+#[derive(Debug, Insertable, Deserialize)]
+#[diesel(table_name = job_assignments)]
+pub struct NewJobAssignment {
+    pub job_id: i32,
+    pub worker_id: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Queryable, Identifiable, Associations)]
+#[diesel(belongs_to(Job))] // FK: job_id
+pub struct JobResult {
+    pub id: i32,
+    pub job_id: i32,
+    pub stdout: Option<String>,
+    pub files: Option<Vec<Option<String>>>, // JSON structure
+    pub saved_at: NaiveDateTime,
+}
+
+#[derive(Debug, Insertable)]
+#[diesel(table_name = job_results)]
+pub struct NewJobResult {
+    pub job_id: i32,
+    pub stdout: Option<String>,
+    pub files: Option<Vec<Option<String>>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Queryable, Identifiable, Associations)]
+#[diesel(belongs_to(Job))] // FK: job_id
+#[diesel(belongs_to(Worker))] // FK: worker_id
+#[diesel(table_name = job_metrics)]
+pub struct JobMetric {
+    pub id: i32,
+    pub job_id: i32,
+    pub worker_id: i32,
+    pub duration_sec: Option<i32>,
+    pub cpu_usage_pct: Option<f32>,
+    pub mem_usage_mb: Option<f32>,
+    pub exit_code: Option<i32>,
+    pub timestamp: NaiveDateTime,
+}
+
+#[derive(Debug, Insertable)]
+#[diesel(table_name = job_metrics)]
+pub struct NewJobMetric {
+    pub job_id: i32,
+    pub worker_id: i32,
+    pub duration_sec: Option<i32>,
+    pub cpu_usage_pct: Option<f32>,
+    pub mem_usage_mb: Option<f32>,
+    pub exit_code: Option<i32>,
 }

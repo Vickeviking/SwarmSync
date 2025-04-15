@@ -9,9 +9,14 @@ use tokio::runtime::Runtime;
 use tokio::signal;
 use tokio::sync::{mpsc, Mutex, Notify};
 
+// Postgres & Redis
 pub mod enums;
 pub mod models;
+pub mod repositories;
+
+//services
 pub mod pulse_broadcaster;
+pub mod schema;
 pub mod service_channels;
 pub mod service_handles;
 pub mod services;
