@@ -1,16 +1,16 @@
-pub mod enums;
-pub mod models;
+pub mod api;
+pub mod core;
+pub mod database;
 pub mod modules;
-pub mod repositories;
-pub mod schema;
 pub mod services;
-pub mod shared_resources;
+pub mod shared;
+pub mod utils;
 
-use crate::enums::system::CoreEvent;
-use crate::modules::{Logger, ModuleHandles};
-use crate::services::{PulseBroadcaster, ServiceChannels, ServiceInitializer, ServiceWiring};
-
-use crate::shared_resources::SharedResources;
+use crate::core::PulseBroadcaster;
+use crate::core::{ModuleInitializer, ServiceInitializer};
+use crate::services::{ServiceChannels, ServiceWiring};
+use crate::shared::{enums::system::CoreEvent, SharedResources};
+use crate::utils::Logger;
 
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -39,14 +39,14 @@ async fn tokio_async_runtime() {
         service_wiring,
     ));
 
-    // Create and start the services
+    // ===== Create and start the services ====
     let initializer =
         ServiceInitializer::new(Arc::clone(&shared_resources), pulse_broadcaster).await;
     let shutdown_notify = initializer.shutdown_notify.clone();
     initializer.start();
 
-    // create and start modules, constructor starts moduels
-    let service_handles = ModuleHandles::new(Arc::clone(&shared_resources));
+    // ==== create and start modules ====
+    let service_handles = ModuleInitializer::new(Arc::clone(&shared_resources));
 
     // Send startup signal to all services
     service_channels

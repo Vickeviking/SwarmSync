@@ -1,4 +1,4 @@
-use crate::{enums::system::CoreEvent, shared_resources::SharedResources};
+use crate::shared::{enums::system::CoreEvent, SharedResources};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 

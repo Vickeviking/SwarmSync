@@ -1,0 +1,2 @@
+[default.databases.postgres]
+url = "postgres://postgres:postgres@postgres/app_db"

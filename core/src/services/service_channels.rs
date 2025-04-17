@@ -1,4 +1,4 @@
-use crate::enums::system::CoreEvent;
+use crate::shared::enums::system::CoreEvent;
 use std::collections::HashMap;
 use tokio::sync::{broadcast, mpsc, RwLock};
 
