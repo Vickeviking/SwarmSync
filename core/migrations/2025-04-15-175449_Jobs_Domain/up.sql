@@ -1,7 +1,7 @@
 -- Your SQL goes here
 CREATE TABLE jobs (
     id SERIAL PRIMARY KEY,
-    admin_id SERIAL REFERENCES admins(id) ON DELETE CASCADE,
+    user_id SERIAL REFERENCES users(id) ON DELETE CASCADE,
     job_name TEXT NOT NULL,
     image_url TEXT NOT NULL,
     image_format varchar(64) NOT NULL,

@@ -1,30 +1,25 @@
-use std::io::Write;
-use std::str::FromStr;
+// ********** FILE CONTENT **********
+//  Models for:
+//      Job, JobAssignment, JobResult, JobMetrics
+//
+// ***********************************
 
-use crate::schema::*;
 use chrono::NaiveDateTime;
-use diesel::deserialize::FromSql;
-use diesel::expression::AsExpression;
-use diesel::pg::{Pg, PgValue};
-use diesel::serialize::ToSql;
-use diesel::sql_types::Text;
-use diesel::{deserialize::FromSqlRow, prelude::*};
+use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::enums::{
     image_format::ImageFormatEnum, job::JobStateEnum, output::OutputTypeEnum,
     schedule::ScheduleTypeEnum,
 };
-use crate::models::{admin::Admin, worker::Worker};
+use crate::models::{user::User, worker::Worker};
 use crate::schema::*;
 
-#[derive(
-    Debug, Serialize, Deserialize, diesel::Queryable, Identifiable, Associations, AsChangeset,
-)]
-#[diesel(belongs_to(Admin))] // FK: admin_id
+#[derive(Debug, Serialize, Deserialize, Queryable, Identifiable, Associations)]
+#[diesel(belongs_to(User))] // FK: user_id
 pub struct Job {
     pub id: i32,
-    pub admin_id: i32,
+    pub user_id: i32,
     pub job_name: String,
     pub image_url: String,
     pub image_format: ImageFormatEnum,
@@ -43,7 +38,7 @@ pub struct Job {
 #[derive(Debug, Insertable)]
 #[diesel(table_name = jobs)]
 pub struct NewJob {
-    pub admin_id: i32,
+    pub user_id: i32,
     pub job_name: String,
     pub image_url: String,
     pub image_format: ImageFormatEnum,

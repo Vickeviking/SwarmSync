@@ -1,16 +1,6 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    admins (id) {
-        id -> Int4,
-        username -> Text,
-        email -> Text,
-        password_hash -> Text,
-        created_at -> Timestamp,
-    }
-}
-
-diesel::table! {
     job_assignments (id) {
         id -> Int4,
         job_id -> Int4,
@@ -47,7 +37,7 @@ diesel::table! {
 diesel::table! {
     jobs (id) {
         id -> Int4,
-        admin_id -> Int4,
+        user_id -> Int4,
         job_name -> Text,
         image_url -> Text,
         #[max_length = 64]
@@ -69,13 +59,47 @@ diesel::table! {
 }
 
 diesel::table! {
+    logs (id) {
+        id -> Int4,
+        created_at -> Timestamp,
+        #[max_length = 64]
+        level -> Varchar,
+        #[max_length = 64]
+        module -> Varchar,
+        #[max_length = 64]
+        action -> Varchar,
+        expires_at -> Timestamp,
+        client_connected_ip -> Nullable<Text>,
+        client_connected_username -> Nullable<Text>,
+        job_submitted_job_id -> Nullable<Int4>,
+        #[max_length = 64]
+        job_submitted_from_module -> Nullable<Varchar>,
+        #[max_length = 64]
+        job_submitted_to_module -> Nullable<Varchar>,
+        job_completed_job_id -> Nullable<Int4>,
+        job_completed_success -> Nullable<Bool>,
+        custom_msg -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    users (id) {
+        id -> Int4,
+        username -> Text,
+        email -> Text,
+        password_hash -> Text,
+        created_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     worker_status (id) {
         id -> Int4,
         worker_id -> Int4,
         #[max_length = 64]
         status -> Varchar,
         last_heartbeat -> Nullable<Timestamp>,
-       active_job_id -> Nullable<Int4>,
+        active_job_id -> Nullable<Int4>,
         uptime_sec -> Nullable<Int4>,
         load_avg -> Nullable<Array<Nullable<Float4>>>,
         last_error -> Nullable<Text>,
@@ -86,7 +110,7 @@ diesel::table! {
 diesel::table! {
     workers (id) {
         id -> Int4,
-        admin_id -> Int4,
+        user_id -> Int4,
         label -> Text,
         ip_address -> Text,
         hostname -> Text,
@@ -107,17 +131,18 @@ diesel::joinable!(job_assignments -> workers (worker_id));
 diesel::joinable!(job_metrics -> jobs (job_id));
 diesel::joinable!(job_metrics -> workers (worker_id));
 diesel::joinable!(job_results -> jobs (job_id));
-diesel::joinable!(jobs -> admins (admin_id));
+diesel::joinable!(jobs -> users (user_id));
 diesel::joinable!(worker_status -> jobs (active_job_id));
 diesel::joinable!(worker_status -> workers (worker_id));
-diesel::joinable!(workers -> admins (admin_id));
+diesel::joinable!(workers -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
-    admins,
     job_assignments,
     job_metrics,
     job_results,
     jobs,
+    logs,
+    users,
     worker_status,
     workers,
 );

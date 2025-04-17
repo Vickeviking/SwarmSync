@@ -1,5 +1,5 @@
-use crate::pulse_broadcaster::PulseSubscriptions;
-use crate::services::logger::Logger;
+use crate::modules::Logger;
+use crate::services::PulseSubscriptions;
 use crate::ServiceChannels;
 use crate::ServiceWiring;
 

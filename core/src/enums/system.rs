@@ -1,4 +1,11 @@
+use diesel::deserialize::{FromSql, FromSqlRow};
+use diesel::expression::AsExpression;
+use diesel::pg::{Pg, PgValue};
+use diesel::serialize::{Output, ToSql};
+use diesel::sql_types::Text;
+use serde::{Deserialize, Serialize};
 use std::hash;
+use std::io::Write;
 use std::str::FromStr;
 
 #[derive(Debug, Clone)]
@@ -61,41 +68,73 @@ impl FromStr for Pulse {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum SystemModule {
+#[derive(AsExpression, Debug, Deserialize, Serialize, FromSqlRow, Clone)]
+#[diesel(sql_type = diesel::sql_types::VarChar)]
+pub enum SystemModuleEnum {
     Dispatcher,
     Harvester,
     Hibernator,
-    Reciever,
+    Receiver,
     Scheduler,
     TaskArchive,
 }
 
-impl ToString for SystemModule {
+impl ToString for SystemModuleEnum {
     fn to_string(&self) -> String {
         match self {
-            SystemModule::Dispatcher => "Dispatcher".to_string(),
-            SystemModule::Harvester => "Harvester".to_string(),
-            SystemModule::Hibernator => "Hibernator".to_string(),
-            SystemModule::Reciever => "Reciever".to_string(),
-            SystemModule::Scheduler => "Scheduler".to_string(),
-            SystemModule::TaskArchive => "TaskArchive".to_string(),
+            SystemModuleEnum::Dispatcher => "Dispatcher".to_string(),
+            SystemModuleEnum::Harvester => "Harvester".to_string(),
+            SystemModuleEnum::Hibernator => "Hibernator".to_string(),
+            SystemModuleEnum::Receiver => "Receiver".to_string(),
+            SystemModuleEnum::Scheduler => "Scheduler".to_string(),
+            SystemModuleEnum::TaskArchive => "TaskArchive".to_string(),
         }
     }
 }
 
-impl FromStr for SystemModule {
+impl FromStr for SystemModuleEnum {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "Dispatcher" => Ok(SystemModule::Dispatcher),
-            "Harvester" => Ok(SystemModule::Harvester),
-            "Hibernator" => Ok(SystemModule::Hibernator),
-            "Reciever" => Ok(SystemModule::Reciever),
-            "Scheduler" => Ok(SystemModule::Scheduler),
-            "TaskArchive" => Ok(SystemModule::TaskArchive),
+            "Dispatcher" => Ok(SystemModuleEnum::Dispatcher),
+            "Harvester" => Ok(SystemModuleEnum::Harvester),
+            "Hibernator" => Ok(SystemModuleEnum::Hibernator),
+            "Receiver" => Ok(SystemModuleEnum::Receiver),
+            "Scheduler" => Ok(SystemModuleEnum::Scheduler),
+            "TaskArchive" => Ok(SystemModuleEnum::TaskArchive),
             _ => Err(()),
         }
+    }
+}
+
+impl FromSql<Text, Pg> for SystemModuleEnum {
+    fn from_sql(value: PgValue<'_>) -> diesel::deserialize::Result<Self> {
+        match value.as_bytes() {
+            b"Dispatcher" => Ok(SystemModuleEnum::Dispatcher),
+            b"Harvester" => Ok(SystemModuleEnum::Harvester),
+            b"Hibernator" => Ok(SystemModuleEnum::Hibernator),
+            b"Receiver" => Ok(SystemModuleEnum::Receiver),
+            b"Scheduler" => Ok(SystemModuleEnum::Scheduler),
+            b"TaskArchive" => Ok(SystemModuleEnum::TaskArchive),
+            _ => Err("Unexpected value".into()),
+        }
+    }
+}
+
+impl ToSql<Text, Pg> for SystemModuleEnum {
+    fn to_sql<'b>(
+        &'b self,
+        out: &mut diesel::serialize::Output<'b, '_, Pg>,
+    ) -> diesel::serialize::Result {
+        match self {
+            SystemModuleEnum::Dispatcher => out.write_all(b"Dispatcher")?,
+            SystemModuleEnum::Harvester => out.write_all(b"Harvester")?,
+            SystemModuleEnum::Hibernator => out.write_all(b"Hibernator")?,
+            SystemModuleEnum::Receiver => out.write_all(b"Receiver")?,
+            SystemModuleEnum::Scheduler => out.write_all(b"Scheduler")?,
+            SystemModuleEnum::TaskArchive => out.write_all(b"TaskArchive")?,
+        }
+        Ok(diesel::serialize::IsNull::No)
     }
 }

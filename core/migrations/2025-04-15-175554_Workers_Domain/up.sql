@@ -2,7 +2,7 @@
 
 CREATE TABLE workers (
     id SERIAL PRIMARY KEY,
-    admin_id SERIAL REFERENCES admins(id) ON DELETE CASCADE,
+    user_id SERIAL REFERENCES users(id) ON DELETE CASCADE,
     label TEXT NOT NULL,
     ip_address TEXT NOT NULL,
     hostname TEXT NOT NULL,

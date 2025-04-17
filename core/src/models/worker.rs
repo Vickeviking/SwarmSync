@@ -1,16 +1,22 @@
+// ********** FILE CONTENT **********
+//  Models for:
+//      Worker, WorkerStatus
+//
+// ***********************************
+
 use crate::enums::workers::{OSEnum, WorkerStatusEnum};
-use crate::models::admin::Admin;
+use crate::models::user::User;
 use crate::schema::{worker_status, workers};
 use chrono::NaiveDateTime;
 use diesel::{Associations, Identifiable, Insertable, Queryable};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Queryable, Identifiable, Associations)]
-#[diesel(belongs_to(Admin))] // FK: admin_id
+#[diesel(belongs_to(User))] // FK: user_id
 #[diesel(table_name = workers)]
 pub struct Worker {
     pub id: i32,
-    pub admin_id: i32,
+    pub user_id: i32,
     pub label: String,
     pub ip_address: String,
     pub hostname: String,
@@ -27,7 +33,7 @@ pub struct Worker {
 #[derive(Debug, Insertable, Deserialize)]
 #[diesel(table_name = workers)]
 pub struct NewWorker {
-    pub admin_id: i32,
+    pub user_id: i32,
     pub label: String,
     pub ip_address: String,
     pub hostname: String,

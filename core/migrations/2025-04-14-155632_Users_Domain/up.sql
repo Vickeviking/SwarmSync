@@ -1,5 +1,5 @@
 -- Your SQL goes here
-CREATE TABLE admins (
+CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,

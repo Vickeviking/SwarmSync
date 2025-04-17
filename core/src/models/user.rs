@@ -1,11 +1,17 @@
-use crate::schema::admins;
+// ********** FILE CONTENT **********
+//  Models for:
+//      User
+//
+// ***********************************
+
+use crate::schema::users;
 use chrono::NaiveDateTime;
 use diesel::{deserialize::FromSqlRow, prelude::*, Insertable, Queryable};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Queryable, Identifiable)]
-#[diesel(table_name = admins)]
-pub struct Admin {
+#[diesel(table_name = users)]
+pub struct User {
     pub id: i32,
     pub username: String,
     pub email: String,
@@ -15,8 +21,8 @@ pub struct Admin {
 }
 
 #[derive(Debug, Deserialize, Insertable)]
-#[diesel(table_name = admins)]
-pub struct NewAdmin {
+#[diesel(table_name = users)]
+pub struct NewUser {
     pub username: String,
     pub email: String,
     pub password_hash: String,
