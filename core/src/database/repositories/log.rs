@@ -37,7 +37,7 @@ pub struct LogEntryRepository;
 
 impl LogEntryRepository {
     // Find log by ID
-    pub async fn find_by_id(c: &mut AsyncPgConnection, id: i32) -> QueryResult<LogEntry> {
+    pub async fn find_by_id(c: &mut AsyncPgConnection, id: i32) -> QueryResult<DBLogEntry> {
         logs::table
             .find(id)
             .get_result(c)
@@ -49,7 +49,7 @@ impl LogEntryRepository {
     pub async fn create(
         c: &mut AsyncPgConnection,
         new_log_entry: NewDBLogEntry,
-    ) -> QueryResult<LogEntry> {
+    ) -> QueryResult<DBLogEntry> {
         diesel::insert_into(logs::table)
             .values(new_log_entry)
             .get_result(c)
@@ -66,91 +66,54 @@ impl LogEntryRepository {
     pub async fn update(
         c: &mut AsyncPgConnection,
         id: i32,
-        updated_log_entry: LogEntry,
-    ) -> QueryResult<LogEntry> {
+        updated: DBLogEntry,
+    ) -> QueryResult<DBLogEntry> {
         diesel::update(logs::table.find(id))
             .set((
-                logs::level.eq(updated_log_entry.level),
-                logs::module.eq(updated_log_entry.module),
-                logs::action.eq(updated_log_entry.action),
-                logs::expires_at.eq(updated_log_entry.expires_at),
-                logs::client_connected_ip.eq(updated_log_entry
-                    .client_connected_payload
-                    .as_ref()
-                    .map(|p| p.ip.clone())),
-                logs::client_connected_username.eq(updated_log_entry
-                    .client_connected_payload
-                    .as_ref()
-                    .map(|p| p.username.clone())),
-                logs::job_submitted_job_id.eq(updated_log_entry
-                    .job_submitted_payload
-                    .as_ref()
-                    .map(|p| p.job_id)),
-                logs::job_submitted_from_module.eq(updated_log_entry
-                    .job_submitted_payload
-                    .as_ref()
-                    .map(|p| p.from_module.clone())),
-                logs::job_submitted_to_module.eq(updated_log_entry
-                    .job_submitted_payload
-                    .as_ref()
-                    .map(|p| p.to_module.clone())),
-                logs::job_completed_job_id.eq(updated_log_entry
-                    .job_completed_payload
-                    .as_ref()
-                    .map(|p| p.job_id)),
-                logs::job_completed_success.eq(updated_log_entry
-                    .job_completed_payload
-                    .as_ref()
-                    .map(|p| p.success)),
-                logs::custom_msg.eq(updated_log_entry.custom_msg),
+                logs::level.eq(updated.level),
+                logs::module.eq(updated.module),
+                logs::action.eq(updated.action),
+                logs::expires_at.eq(updated.expires_at),
+                logs::client_connected_ip.eq(updated.client_connected_ip),
+                logs::client_connected_username.eq(updated.client_connected_username),
+                logs::job_submitted_job_id.eq(updated.job_submitted_job_id),
+                logs::job_submitted_from_module.eq(updated.job_submitted_from_module),
+                logs::job_submitted_to_module.eq(updated.job_submitted_to_module),
+                logs::job_completed_job_id.eq(updated.job_completed_job_id),
+                logs::job_completed_success.eq(updated.job_completed_success),
+                logs::custom_msg.eq(updated.custom_msg),
             ))
-            .get_result(c)
+            .get_result::<DBLogEntry>(c)
             .await
-            .map(|db_log: DBLogEntry| db_log.into())
     }
 
     // Search logs by action
     pub async fn search_by_action(
         c: &mut AsyncPgConnection,
         query: &str,
-    ) -> QueryResult<Vec<LogEntry>> {
+    ) -> QueryResult<Vec<DBLogEntry>> {
         logs::table
             .filter(logs::action.ilike(format!("%{}%", query)))
             .load(c)
             .await
-            .map(|db_logs: Vec<DBLogEntry>| {
-                db_logs.into_iter().map(|db_log| db_log.into()).collect()
-            })
     }
 
-    // Search logs by level
     pub async fn search_by_level(
         c: &mut AsyncPgConnection,
         query: &str,
-    ) -> QueryResult<Vec<LogEntry>> {
+    ) -> QueryResult<Vec<DBLogEntry>> {
         logs::table
             .filter(logs::level.ilike(format!("%{}%", query)))
             .load(c)
             .await
-            .map(|db_logs: Vec<DBLogEntry>| {
-                db_logs.into_iter().map(|db_log| db_log.into()).collect()
-            })
     }
 
-    // List all logs with pagination
     pub async fn list_all(
         c: &mut AsyncPgConnection,
         limit: i64,
         offset: i64,
-    ) -> QueryResult<Vec<LogEntry>> {
-        logs::table
-            .limit(limit)
-            .offset(offset)
-            .load(c)
-            .await
-            .map(|db_logs: Vec<DBLogEntry>| {
-                db_logs.into_iter().map(|db_log| db_log.into()).collect()
-            })
+    ) -> QueryResult<Vec<DBLogEntry>> {
+        logs::table.limit(limit).offset(offset).load(c).await
     }
 
     // Check if a log with the specific action exists
@@ -177,7 +140,7 @@ impl LogEntryRepository {
     pub async fn find_logs_by_module(
         c: &mut AsyncPgConnection,
         module: SystemModuleEnum,
-    ) -> QueryResult<Vec<LogEntry>> {
+    ) -> QueryResult<Vec<DBLogEntry>> {
         logs::table
             .filter(logs::module.eq(module))
             .load(c)

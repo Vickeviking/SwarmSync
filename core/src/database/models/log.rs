@@ -69,7 +69,7 @@ pub struct DBLogEntry {
     pub custom_msg: Option<String>, // Nullable custom message
 }
 
-#[derive(Debug, Insertable)]
+#[derive(Debug, Insertable, Deserialize)]
 #[diesel(table_name = logs)]
 pub struct NewDBLogEntry {
     pub level: LogLevelEnum,

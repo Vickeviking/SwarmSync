@@ -35,7 +35,7 @@ pub struct Job {
     pub updated_at: NaiveDateTime,
 }
 
-#[derive(Debug, Insertable)]
+#[derive(Debug, Insertable, Deserialize)]
 #[diesel(table_name = jobs)]
 pub struct NewJob {
     pub user_id: i32,
@@ -79,7 +79,7 @@ pub struct JobResult {
     pub saved_at: NaiveDateTime,
 }
 
-#[derive(Debug, Insertable)]
+#[derive(Debug, Insertable, Deserialize)]
 #[diesel(table_name = job_results)]
 pub struct NewJobResult {
     pub job_id: i32,
@@ -102,7 +102,7 @@ pub struct JobMetric {
     pub timestamp: NaiveDateTime,
 }
 
-#[derive(Debug, Insertable)]
+#[derive(Debug, Insertable, Deserialize)]
 #[diesel(table_name = job_metrics)]
 pub struct NewJobMetric {
     pub job_id: i32,
