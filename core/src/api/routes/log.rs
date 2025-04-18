@@ -30,110 +30,30 @@ pub fn routes() -> Vec<Route> {
         exists_log_by_action,
     ]
 }
-/*======================== Routes Logs ========================
 
-== CRUD ==
-• `POST /logs`             → create(NewDBLogEntry) -> LogEntry
-• `GET /logs/:id`          → find_by_id(id) -> LogEntry
-• `DELETE /logs/:id`       → delete(id) -> usize
-• `PUT /logs/:id`          → update(id, LogEntry) -> LogEntry
+/* ===================== ⚙️ Logs API Overview =====================
 
-== Lookup & Search ==
-• `GET /logs/search/level?q=INFO`       → search_by_level(query) -> Vec<LogEntry>
-• `GET /logs/search/module?q=Scheduler` → find_logs_by_module(module: SystemModuleEnum)
-• `GET /logs/search/action?q=dispatch`  → search_by_action(query)
-• `GET /logs?page=x&limit=y`            → list_all(limit, offset)
+== 🛠️ CRUD ==
+• POST    /logs                           → Create new log entry (NewDBLogEntry)   → 201 Created (LogEntry)
+• GET     /logs/:id                       → Fetch log entry by ID                   → 200 OK (LogEntry)
+• DELETE  /logs/:id                       → Delete log entry by ID                  → 204 No Content
+• PUT     /logs/:id                       → Update log entry by ID                  → 200 OK (LogEntry)
 
-== Field Updates ==
-• `PATCH /logs/:id/msg`       → update_custom_msg(id, msg) -> LogEntry (not implemented yet, implied)
-• `PATCH /logs/:id/ttl`       → update_expires_at(id, new_time) -> LogEntry (not implemented yet, implied)
+== 🔍 Lookup & Search ==
+• GET     /logs/search/level?q=:level     → Search logs by level                    → 200 OK (Vec<LogEntry>)
+• GET     /logs/search/module?q=:module   → Search logs by module                   → 200 OK (Vec<LogEntry>)
+• GET     /logs/search/action?q=:action   → Search logs by action                   → 200 OK (Vec<LogEntry>)
+• GET     /logs?page=:page&limit=:limit   → List all logs (paginated)               → 200 OK (Vec<LogEntry>)
 
-== Existence Checks ==
-• `HEAD /logs/exists?action=foo`  → exists_by_action(action) -> bool
-• `HEAD /logs/exists?level=info`  → exists_by_level(level) -> bool
-*/
+== 🔄 Field Updates ==
+• PATCH   /logs/:id/msg                   → Update custom message                   → 200 OK (LogEntry)
+• PATCH   /logs/:id/ttl                   → Update time-to-live                     → 200 OK (LogEntry)
 
-/* ======= Log model =======
-// Used in the application
-pub struct LogEntry {
-    pub id: i32,
-    pub created_at: NaiveDateTime,
-    pub level: LogLevelEnum,
-    pub module: SystemModuleEnum,
-    pub action: LogActionEnum,
-    pub expires_at: NaiveDateTime,
+== ⚡ Existence Checks ==
+• HEAD    /logs/exists?action=:action     → Exists logs by action                   → 200 OK / 404 Not Found
+• HEAD    /logs/exists?level=:level       → Exists logs by level                    → 200 OK / 404 Not Found
 
-    // Embed the payloads directly
-    pub client_connected_payload: Option<ClientConnectedPayload>,
-    pub job_submitted_payload: Option<JobSubmittedPayload>,
-    pub job_completed_payload: Option<JobCompletedPayload>,
-    pub custom_msg: Option<String>,
-}
-
-pub struct ClientConnectedPayload {
-    pub ip: String,
-    pub username: String,
-}
-
-pub struct JobSubmittedPayload {
-    pub job_id: i32,
-    pub from_module: SystemModuleEnum,
-    pub to_module: SystemModuleEnum,
-}
-
-pub struct JobCompletedPayload {
-    pub job_id: i32,
-    pub success: bool,
-}
-
-// ====== DATABASE STORED STRUCTS ====
-
-#[derive(Debug, Serialize, Deserialize, Queryable, Identifiable)]
-#[diesel(table_name = logs)]
-pub struct DBLogEntry {
-    pub id: i32,
-    pub created_at: NaiveDateTime,
-    pub level: LogLevelEnum,
-    pub module: SystemModuleEnum,
-    pub action: LogActionEnum,
-    pub expires_at: NaiveDateTime,
-
-    // Optional fields for the foreign keys to payload tables
-    pub client_connected_ip: Option<String>, // Nullable IP field
-    pub client_connected_username: Option<String>, // Nullable Username field
-
-    pub job_submitted_job_id: Option<i32>, // Nullable Job ID
-    pub job_submitted_from_module: Option<SystemModuleEnum>, // Nullable From module
-    pub job_submitted_to_module: Option<SystemModuleEnum>, // Nullable To module
-
-    pub job_completed_job_id: Option<i32>,   // Nullable Job ID
-    pub job_completed_success: Option<bool>, // Nullable Success flag
-
-    pub custom_msg: Option<String>, // Nullable custom message
-}
-
-#[derive(Debug, Insertable)]
-#[diesel(table_name = logs)]
-pub struct NewDBLogEntry {
-    pub level: LogLevelEnum,
-    pub module: SystemModuleEnum,
-    pub action: LogActionEnum,
-    pub expires_at: NaiveDateTime,
-
-    // Optional fields for the foreign keys to payload tables
-    pub client_connected_ip: Option<String>, // Nullable IP field
-    pub client_connected_username: Option<String>, // Nullable Username field
-
-    pub job_submitted_job_id: Option<i32>, // Nullable Job ID
-    pub job_submitted_from_module: Option<SystemModuleEnum>, // Nullable From module
-    pub job_submitted_to_module: Option<SystemModuleEnum>, // Nullable To module
-
-    pub job_completed_job_id: Option<i32>,   // Nullable Job ID
-    pub job_completed_success: Option<bool>, // Nullable Success flag
-
-    pub custom_msg: Option<String>, // Nullable custom message
-}
-*/
+======================================================================== */
 
 // ===== CRUD ======
 #[post("/logs", format = "json", data = "<entry>")]

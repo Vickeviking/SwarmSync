@@ -28,49 +28,21 @@ pub fn routes() -> Vec<Route> {
     ]
 }
 
-/*
-============================== Routes JobMetric ==============================
+/* ===================== ⚙️ JobMetric API Overview =====================
 
-== CRUD ==
-• `POST /metrics`        → create(NewJobMetric) -> JobMetric
-• `GET /metrics/:id`     → find_by_id(id) -> JobMetric
-• `DELETE /metrics/:id`  → delete(id) -> usize
+== 🛠️ CRUD ==
+• POST   /metrics                             → Create new metric (NewJobMetric) → 201 Created (JobMetric)
+• GET    /metrics/:id                         → Fetch metric by ID             → 200 OK (JobMetric)
+• DELETE /metrics/:id                         → Delete metric by ID            → 204 No Content
 
-== Lookup & Search ==
-• `GET /metrics/by_job/:job_id`          → find_by_job_id(job_id) -> Vec<JobMetric>
-• `GET /metrics/by_worker/:worker_id`    → find_by_worker_id(worker_id) -> Vec<JobMetric>
-• `GET /metrics/recent/:job_id`          → get_most_recent_for_job(job_id) -> Option<JobMetric>
-• `GET /metrics/chronological/:job_id`   → list_metrics_for_job(job_id) -> Vec<JobMetric>
-• `GET /metrics/worker_stream/:worker_id` → get_metrics_by_worker(worker_id) -> Vec<JobMetric>
-*/
+== 🔍 Lookup & Search ==
+• GET    /metrics/by_job/:job_id              → Metrics by Job ID              → 200 OK (Vec<JobMetric>)
+• GET    /metrics/by_worker/:worker_id        → Metrics by Worker ID           → 200 OK (Vec<JobMetric>)
+• GET    /metrics/recent/:job_id              → Most recent metric for Job     → 200 OK (Option<JobMetric>)
+• GET    /metrics/chronological/:job_id       → Chronological metrics for Job  → 200 OK (Vec<JobMetric>)
+• GET    /metrics/worker_stream/:worker_id    → Worker metric stream           → 200 OK (Vec<JobMetric>)
 
-/* ========== JobMetric ===========
-#[derive(Debug, Serialize, Deserialize, Queryable, Identifiable, Associations)]
-#[diesel(belongs_to(Job))] // FK: job_id
-#[diesel(belongs_to(Worker))] // FK: worker_id
-#[diesel(table_name = job_metrics)]
-pub struct JobMetric {
-    pub id: i32,
-    pub job_id: i32,
-    pub worker_id: i32,
-    pub duration_sec: Option<i32>,
-    pub cpu_usage_pct: Option<f32>,
-    pub mem_usage_mb: Option<f32>,
-    pub exit_code: Option<i32>,
-    pub timestamp: NaiveDateTime,
-}
-
-#[derive(Debug, Insertable)]
-#[diesel(table_name = job_metrics)]
-pub struct NewJobMetric {
-    pub job_id: i32,
-    pub worker_id: i32,
-    pub duration_sec: Option<i32>,
-    pub cpu_usage_pct: Option<f32>,
-    pub mem_usage_mb: Option<f32>,
-    pub exit_code: Option<i32>,
-}
-*/
+======================================================================== */
 
 // ===== CRUD =======
 #[post("/metrics", format = "json", data = "<new_metric>")]

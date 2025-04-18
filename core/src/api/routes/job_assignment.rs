@@ -32,46 +32,26 @@ pub fn routes() -> Vec<Route> {
     ]
 }
 
-/* ================================== Routes JobAssignment ==================================
+/* ===================== ⚙️ JobAssignment API Overview =====================
 
-== CRUD ==
-• `POST /assignments`        → create(NewJobAssignment) -> JobAssignment
-• `GET /assignments/:id`     → find_by_id(id) -> JobAssignment
-• `DELETE /assignments/:id`  → delete(id) -> usize
+== 🛠️ CRUD ==
+• POST   /assignments                    → Create new assignment (NewJobAssignment) → 201 Created (JobAssignment)
+• GET    /assignments/:id               → Fetch assignment by ID → 200 OK (JobAssignment)
+• DELETE /assignments/:id               → Delete assignment by ID → 204 No Content
 
-== Lookup & Search ==
-• `GET /assignments/by_job/:job_id`             → find_by_job_id(job_id) -> Vec<JobAssignment>
-• `GET /assignments/by_worker/:worker_id`       → find_by_worker_id(worker_id) -> Vec<JobAssignment>
-• `GET /assignments/lookup/:job_id/:worker_id`  → find_assignment_by_job_and_worker(job_id, worker_id) -> Option<JobAssignment>
-• `GET /assignments/by_worker/range`            → find_assignments_for_worker_in_time_range(worker_id, start, end) -> Vec<JobAssignment>
-• `GET /assignments/active` → list_active_assignments() -> Vec<JobAssignment>
+== 🔍 Lookup & Search ==
+• GET /assignments/by_job/:job_id                  → Assignments by Job ID → 200 OK (Vec<JobAssignment>)
+• GET /assignments/by_worker/:worker_id            → Assignments by Worker ID → 200 OK (Vec<JobAssignment>)
+• GET /assignments/lookup/:job_id/:worker_id       → Assignment by Job + Worker → 200 OK (Option<JobAssignment>)
+• GET /assignments/by_worker/range?worker_id&start&end
+                                                  → Assignments in time range for worker → 200 OK (Vec<JobAssignment>)
+• GET /assignments/active                          → Currently active assignments → 200 OK (Vec<JobAssignment>)
 
-== State Updates ==
-• `PATCH /assignments/:id/started`   → update_started_at(id, started_at) -> JobAssignment
-• `PATCH /assignments/:id/finished`  → update_finished_at(id, finished_at) -> JobAssignment
+== 🔄 State Transitions ==
+• PATCH /assignments/:id/started   → Mark assignment as started (NaiveDateTime) → 200 OK (JobAssignment)
+• PATCH /assignments/:id/finished  → Mark assignment as finished (NaiveDateTime) → 200 OK (JobAssignment)
 
-*/
-
-/* ========== JobAssignment model ============
-#[derive(Debug, Serialize, Deserialize, Queryable, Identifiable, Associations)]
-#[diesel(belongs_to(Job))] // FK: job_id
-#[diesel(belongs_to(Worker))] // FK: worker_id
-pub struct JobAssignment {
-    pub id: i32,
-    pub job_id: i32,
-    pub worker_id: i32,
-    pub assigned_at: NaiveDateTime,
-    pub started_at: Option<NaiveDateTime>,
-    pub finished_at: Option<NaiveDateTime>,
-}
-
-#[derive(Debug, Insertable, Deserialize)]
-#[diesel(table_name = job_assignments)]
-pub struct NewJobAssignment {
-    pub job_id: i32,
-    pub worker_id: i32,
-}
-*/
+======================================================================== */
 
 // ========== CRUD =========
 #[post("/assignments", format = "json", data = "<new_assignment>")]

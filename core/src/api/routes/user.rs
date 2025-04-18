@@ -33,55 +33,34 @@ pub fn routes() -> Vec<Route> {
     ]
 }
 
-/* ==================== Routes User ====================
+/* ===================== ⚙️ User API Overview =====================
 
-== CRUD ==
-• `GET /users/:id` → find_by_id(id) -> User
-• `POST /users` → create(NewUser) -> User
-• `DELETE /users/:id` → delete(id) -> usize
-• `PUT /users/:id` → update(id, User) -> User
+== 🛠️ CRUD ==
+• GET     /users/:id                         → Fetch user by ID                       → 200 OK (User)
+• POST    /users                             → Create new user (NewUser)             → 201 Created (User)
+• DELETE  /users/:id                         → Delete user by ID                     → 204 No Content
+• PUT     /users/:id                         → Update user by ID                     → 200 OK (User)
 
-== Lookup ==
-• `GET /users/email/:email` → find_by_email(email) -> Option<User>
-• `GET /users/username/:username` → find_by_username(username) -> Option<User>
+== 🔍 Lookup ==
+• GET     /users/email/:email                → Find user by email                    → 200 OK (Option<User>)
+• GET     /users/username/:username          → Find user by username                 → 200 OK (Option<User>)
 
-== Search ==
-• `GET /users/search/username?q=alice` → search_by_username(query) -> Vec<User>
-• `GET /users/search/email?q=example.com` → search_by_email(query) -> Vec<User>
+== 🔍 Search ==
+• GET     /users/search/username?q=:q        → Search users by username              → 200 OK (Vec<User>)
+• GET     /users/search/email?q=:q           → Search users by email                 → 200 OK (Vec<User>)
 
-== Listing ==
-• `GET /users?page=x&limit=y` → list_all(limit, offset) -> Vec<User>
+== 📑 Listing ==
+• GET     /users?page=:page&limit=:limit     → List all users (paginated)            → 200 OK (Vec<User>)
 
-== Existence Checks ==
-• `HEAD /users/exists/email/:email` → exists_by_email(email) -> bool
-• `HEAD /users/exists/username/:username` → exists_by_username(username) -> bool
+== ⚡ Existence Checks ==
+• HEAD    /users/exists/email/:email         → Exists by email                       → 200 OK / 404 Not Found
+• HEAD    /users/exists/username/:username   → Exists by username                    → 200 OK / 404 Not Found
 
-== Relational & Aggregation ==
-• `GET /users/with-jobs` → find_users_with_jobs() -> Vec<User>
-• `GET /users/job-counts` → get_user_with_job_counts() -> Vec<(User, i64)>
+== 🔗 Relational & Aggregation ==
+• GET     /users/with-jobs                   → Users with jobs                       → 200 OK (Vec<User>)
+• GET     /users/job-counts                  → User job counts                       → 200 OK (Vec<(User, i64)>)
 
-*/
-
-/* ====== User model ========
-#[derive(Debug, Clone, Serialize, Deserialize, Queryable, Identifiable)]
-#[diesel(table_name = users)]
-pub struct User {
-    pub id: i32,
-    pub username: String,
-    pub email: String,
-    #[serde(skip_serializing)]
-    pub password_hash: String,
-    pub created_at: NaiveDateTime,
-}
-
-#[derive(Debug, Deserialize, Insertable)]
-#[diesel(table_name = users)]
-pub struct NewUser {
-    pub username: String,
-    pub email: String,
-    pub password_hash: String,
-}
-*/
+======================================================================== */
 
 // === CRUD ===
 #[get("/users/<id>")]

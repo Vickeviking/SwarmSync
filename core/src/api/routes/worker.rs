@@ -31,61 +31,23 @@ pub fn routes() -> Vec<Route> {
     ]
 }
 
-/* ==================== Routes Worker ====================
+/* ===================== ⚙️ Worker API Overview =====================
 
-== CRUD ==
-• `POST /workers` → create(NewWorker) -> Worker
-• `GET /workers/:id` → find_by_id(id) -> Worker
-• `DELETE /workers/:id` → delete_worker(id) -> usize
+== 🛠️ CRUD ==
+• POST    /workers                           → Create new worker (NewWorker)      → 201 Created (Worker)
+• GET     /workers/:id                       → Fetch worker by ID                 → 200 OK (Worker)
+• DELETE  /workers/:id                       → Delete worker by ID                → 204 No Content
 
-== Lookup & Search ==
-• `GET /workers/admin/:admin_id` → find_by_admin_id(user_id) -> Vec<Worker>
-• `GET /workers/label/:label` → find_by_label(label) -> Option<Worker>
-• `GET /workers/ip/:ip_address` → find_by_ip_address(ip_address) -> Option<Worker>
-• `GET /workers/admin/:admin_id/list` → list_workers_by_admin(user_id, limit, offset) -> Vec<Worker>
+== 🔍 Lookup & Search ==
+• GET     /workers/admin/:admin_id           → Workers by Admin ID                → 200 OK (Vec<Worker>)
+• GET     /workers/label/:label              → Find worker by label               → 200 OK (Option<Worker>)
+• GET     /workers/ip/:ip_address            → Find worker by IP address          → 200 OK (Option<Worker>)
+• GET     /workers/admin/:admin_id/list      → List workers by Admin (paginated)  → 200 OK (Vec<Worker>)
 
-== State Update ==
-• `PUT /workers/:id/last-seen` → update_last_seen_at(id, last_seen_at) -> Worker
+== 🔄 State Update ==
+• PUT     /workers/:id/last-seen             → Update last-seen timestamp         → 200 OK (Worker)
 
-*/
-
-/* ==== Worker model =====
-#[derive(Debug, Clone, Serialize, Deserialize, Queryable, Identifiable, Associations)]
-#[diesel(belongs_to(User))] // FK: user_id
-#[diesel(table_name = workers)]
-pub struct Worker {
-    pub id: i32,
-    pub user_id: i32,
-    pub label: String,
-    pub ip_address: String,
-    pub hostname: String,
-    pub ssh_user: String,
-    pub ssh_key: String,
-    pub docker_version: String,
-    pub arch: String,
-    pub os: OSEnum,
-    pub tags: Option<Vec<Option<String>>>,
-    pub created_at: NaiveDateTime,
-    pub last_seen_at: Option<NaiveDateTime>,
-}
-
-#[derive(Debug, Insertable, Deserialize)]
-#[diesel(table_name = workers)]
-pub struct NewWorker {
-    pub user_id: i32,
-    pub label: String,
-    pub ip_address: String,
-    pub hostname: String,
-    pub ssh_user: String,
-    pub ssh_key: String,
-    pub docker_version: String,
-    pub arch: String,
-    pub os: OSEnum,
-    pub tags: Option<Vec<Option<String>>>,
-}
-
-
-*/
+======================================================================== */
 
 // ===== CRUD =====
 #[post("/workers", format = "json", data = "<new_worker>")]

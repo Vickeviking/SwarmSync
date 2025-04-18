@@ -40,79 +40,42 @@ pub fn routes() -> Vec<Route> {
         list_jobs_with_no_assignment,
     ]
 }
-
 /*
-======================== Routes Job ========================
+===================== 🚀 Job API Overview =====================
 
-== CRUD ==
-• `POST /jobs`          → create(NewJob) -> Job
-• `GET /jobs/:id`       → find_by_id(id) -> Job
-• `PATCH /jobs/:id`     → update(id, Job) -> Job
-• `DELETE /jobs/:id`    → delete(id) -> usize
+== 🛠️ CRUD ==
+• POST   /jobs                     -> Creates a new job (NewJob)           → 201 Created (Job)
+• GET    /jobs/:id                 -> Fetch job by ID                      → 200 OK (Job)
+• PATCH  /jobs/:id                 -> Update job by ID (Job)               → 200 OK (Job)
+• DELETE /jobs/:id                -> Delete job by ID                     → 204 No Content
 
-== Lookup & Search ==
-• `GET /jobs/search`    → search_by_job_name(user_id, query) -> Vec<Job>
-• `GET /jobs/name/:str` → find_by_name(user_id, name) -> Option<Job>
-• `GET /jobs/by_admin`  → list_by_admin(user_id, limit, offset) -> Vec<Job>
-• `GET /jobs/state/:st` → list_by_state(state) -> Vec<Job>
-• `GET /jobs/recent`    → get_recent_jobs(limit) -> Vec<Job>
-• `GET /jobs/failed`    → get_failed_jobs(limit) -> Vec<Job>
+== 🔍 Lookup & Search ==
+• GET    /jobs/search?user_id&query         -> Fuzzy match jobs by name         → 200 OK (Vec<Job>)
+• GET    /jobs/name/:user_id?name           -> Exact match job by name          → 200 OK (Vec<Job>)
+• GET    /jobs/by_admin?user_id&limit&offset→ Jobs by a specific admin          → 200 OK (Vec<Job>)
+• GET    /jobs/state/:state                 -> Jobs by job state enum           → 200 OK (Vec<Job>)
+• GET    /jobs/recent?limit                 -> Most recent jobs (default 10)    → 200 OK (Vec<Job>)
+• GET    /jobs/failed?limit                 -> Recently failed jobs             → 200 OK (Vec<Job>)
 
-== State Transitions ==
-• `PATCH /jobs/:id/running`   → mark_running(id) -> Job
-• `PATCH /jobs/:id/succeeded` → mark_succeeded(id) -> Job
-• `PATCH /jobs/:id/failed`    → mark_failed(id, msg) -> Job
+== 🔄 State Transitions ==
+• PATCH  /jobs/:id/running        -> Mark job as running                   → 200 OK (Job)
+• PATCH  /jobs/:id/succeeded      -> Mark job as succeeded                 → 200 OK (Job)
+• PATCH  /jobs/:id/failed         -> Mark job as failed (with message)     → 200 OK (Job)
 
-== Scheduling & Readiness ==
-• `GET /jobs/scheduled`       → list_scheduled_jobs() -> Vec<Job>
-• `GET /jobs/cron_due`        → list_due_cron_jobs(date, time) -> Vec<Job>
-• `GET /jobs/ready`           → list_one_time_jobs_ready() -> Vec<Job>
+== ⏱️ Scheduling & Readiness ==
+• GET    /jobs/scheduled                   -> All jobs with a schedule          → 200 OK (Vec<Job>)
+• GET    /jobs/cron_due?date&time         -> Cron jobs due at a given time     → 200 OK (Vec<Job>)
+• GET    /jobs/ready                       -> One-time jobs ready to run        → 200 OK (Vec<Job>)
 
-== Aggregation & Stats ==
-• `GET /jobs/stats/admins`    → get_job_counts_per_admin() -> Vec<(admin_id, job_count)>
+== 📊 Aggregation & Stats ==
+• GET    /jobs/stats/admins                -> Job count grouped by admin ID     → 200 OK (Vec<(i32, i64)>)
 
-== Assignment-related ==
-• `GET /jobs/active/:worker`  → get_active_jobs_for_worker(worker_id) -> Vec<Job>
-• `GET /jobs/assigned/:worker`→ find_jobs_assigned_to_worker(worker_id) -> Vec<Job>
-• `GET /jobs/unassigned`      → list_jobs_with_no_assignment() -> Vec<Job>
+== 🤝 Assignment & Worker Routing ==
+• GET    /jobs/active/:worker_id           -> Active jobs for worker            → 200 OK (Vec<Job>)
+• GET    /jobs/assigned/:worker_id         -> Jobs assigned to worker           → 200 OK (Vec<Job>)
+• GET    /jobs/unassigned                  -> Jobs with no worker assignment    → 200 OK (Vec<Job>)
 
-*/
-
-/** ========  Job model  ===========
-#[derive(Debug, Serialize, Deserialize, Queryable, Identifiable, Associations)]
-#[diesel(belongs_to(User))] // FK: user_id
-pub struct Job {
-    pub id: i32,
-    pub user_id: i32,
-    pub job_name: String,
-    pub image_url: String,
-    pub image_format: ImageFormatEnum,
-    pub docker_flags: Option<Vec<Option<String>>>,
-    pub output_type: OutputTypeEnum,
-    pub output_paths: Option<Vec<Option<String>>>,
-    pub schedule_type: ScheduleTypeEnum,
-    pub cron_expression: Option<String>,
-    pub notes: Option<String>,
-    pub state: JobStateEnum,
-    pub error_message: Option<String>,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
-}
-
-#[derive(Debug, Insertable)]
-#[diesel(table_name = jobs)]
-pub struct NewJob {
-    pub user_id: i32,
-    pub job_name: String,
-    pub image_url: String,
-    pub image_format: ImageFormatEnum,
-    pub docker_flags: Option<Vec<Option<String>>>,
-    pub output_type: OutputTypeEnum,
-    pub output_paths: Option<Vec<Option<String>>>,
-    pub schedule_type: ScheduleTypeEnum,
-    pub cron_expression: Option<String>,
-    pub notes: Option<String>,
-}
+===============================================================
 */
 
 // ======= CRUD =======

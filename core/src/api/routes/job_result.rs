@@ -27,43 +27,24 @@ pub fn routes() -> Vec<Route> {
         update_files
     ]
 }
-/*
-============================== Routes JobResult ==============================
 
-== CRUD ==
-• `POST /results`        → create(NewJobResult) -> JobResult
-• `GET /results/:id`     → find_by_id(id) -> JobResult
-• `DELETE /results/:id`  → delete(id) -> usize
+/* ===================== ⚙️ JobResult API Overview =====================
 
-== Lookup & Search ==
-• `GET /results/job/:job_id`         → find_by_job_id(job_id) -> Vec<JobResult>
-• `GET /results/list/:job_id`        → list_results_for_job(job_id) -> Vec<JobResult>
-• `GET /results/recent/:job_id`      → get_most_recent_for_job(job_id) -> Option<JobResult>
+== 🛠️ CRUD ==
+• POST    /results                   → Create new result (NewJobResult)         → 201 Created (JobResult)
+• GET     /results/:id               → Fetch result by ID                       → 200 OK (JobResult)
+• DELETE  /results/:id               → Delete result by ID                      → 204 No Content
 
-== Field Updates ==
-• `PATCH /results/:id/stdout`        → update_stdout(id, new_stdout) -> JobResult
-• `PATCH /results/:id/files`         → update_files(id, new_files) -> JobResult
-*/
+== 🔍 Lookup & Search ==
+• GET     /results/job/:job_id       → Results by Job ID                        → 200 OK (Vec<JobResult>)
+• GET     /results/list/:job_id      → List results for Job                     → 200 OK (Vec<JobResult>)
+• GET     /results/recent/:job_id    → Most recent result for Job               → 200 OK (Option<JobResult>)
 
-/* ======== JobResult model ==========
-#[derive(Debug, Serialize, Deserialize, Queryable, Identifiable, Associations)]
-#[diesel(belongs_to(Job))] // FK: job_id
-pub struct JobResult {
-    pub id: i32,
-    pub job_id: i32,
-    pub stdout: Option<String>,
-    pub files: Option<Vec<Option<String>>>, // JSON structure
-    pub saved_at: NaiveDateTime,
-}
+== 🔄 Field Updates ==
+• PATCH   /results/:id/stdout        → Update stdout field                      → 200 OK (JobResult)
+• PATCH   /results/:id/files         → Update files field                       → 200 OK (JobResult)
 
-#[derive(Debug, Insertable)]
-#[diesel(table_name = job_results)]
-pub struct NewJobResult {
-    pub job_id: i32,
-    pub stdout: Option<String>,
-    pub files: Option<Vec<Option<String>>>,
-}
-*/
+======================================================================== */
 
 // ===== CRUD =====
 #[post("/results", format = "json", data = "<new_result>")]

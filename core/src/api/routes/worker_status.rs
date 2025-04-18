@@ -15,6 +15,7 @@ use rocket_db_pools::{Connection, Database};
 use std::env;
 use std::sync::Arc;
 use tokio::sync::{broadcast::error::RecvError, mpsc, RwLock};
+
 // === Mount routes ===
 pub fn routes() -> Vec<Route> {
     routes![
@@ -31,53 +32,26 @@ pub fn routes() -> Vec<Route> {
     ]
 }
 
-/* ==================== Routes WorkerStatus ====================
-== CRUD ==
-• `POST /worker-status` → create(NewWorkerStatus) -> WorkerStatus
-• `GET /worker-status/:id` → find_by_id(id) -> WorkerStatus
-• `DELETE /worker-status/:id` → delete_worker_status(id) -> usize
+/* ===================== ⚙️ WorkerStatus API Overview =====================
 
-== Lookup & Search ==
-• `GET /worker-status/worker/:worker_id` → find_by_worker_id(worker_id) -> Option<WorkerStatus>
+== 🛠️ CRUD ==
+• POST    /worker-status                      → Create new status (NewWorkerStatus)     → 201 Created (WorkerStatus)
+• GET     /worker-status/:id                  → Fetch status by ID                       → 200 OK (WorkerStatus)
+• DELETE  /worker-status/:id                  → Delete status by ID                      → 204 No Content
 
-== State Update ==
-• `PUT /worker-status/:id/status` → update_status(id, status) -> WorkerStatus
-• `PUT /worker-status/:id/last-heartbeat` → update_last_heartbeat(id, last_heartbeat) -> WorkerStatus
-• `PUT /worker-status/:id/active-job-id` → update_active_job_id(id, active_job_id) -> WorkerStatus
-• `PUT /worker-status/:id/uptime` → update_uptime(id, uptime_sec) -> WorkerStatus
-• `PUT /worker-status/:id/load-avg` → update_load_avg(id, load_avg) -> WorkerStatus
-• `PUT /worker-status/:id/last-error` → update_last_error(id, last_error) -> WorkerStatus
+== 🔍 Lookup & Search ==
+• GET     /worker-status/worker/:worker_id    → Find status by Worker ID                → 200 OK (Option<WorkerStatus>)
 
-*/
+== 🔄 State Updates ==
+• PUT     /worker-status/:id/status           → Update overall status                   → 200 OK (WorkerStatus)
+• PUT     /worker-status/:id/last-heartbeat  → Update last heartbeat timestamp         → 200 OK (WorkerStatus)
+• PUT     /worker-status/:id/active-job-id    → Update active job ID                    → 200 OK (WorkerStatus)
+• PUT     /worker-status/:id/uptime           → Update uptime in seconds                → 200 OK (WorkerStatus)
+• PUT     /worker-status/:id/load-avg         → Update load average                     → 200 OK (WorkerStatus)
+• PUT     /worker-status/:id/last-error       → Update last error message               → 200 OK (WorkerStatus)
 
-/* ======= WorkerStatus model ========
-#[derive(Debug, Serialize, Deserialize, Queryable, Identifiable, Associations)]
-#[diesel(belongs_to(Worker))]
-#[diesel(table_name = worker_status)]
-pub struct WorkerStatus {
-    pub id: i32,
-    pub worker_id: i32,
-    pub status: WorkerStatusEnum,
-    pub last_heartbeat: Option<NaiveDateTime>,
-    pub active_job_id: Option<i32>,
-    pub uptime_sec: Option<i32>,
-    pub load_avg: Option<Vec<Option<f32>>>,
-    pub last_error: Option<String>,
-    pub updated_at: NaiveDateTime,
-}
+======================================================================== */
 
-#[derive(Debug, Insertable, Deserialize)]
-#[diesel(table_name = worker_status)]
-pub struct NewWorkerStatus {
-    pub worker_id: i32,
-    pub status: WorkerStatusEnum,
-    pub last_heartbeat: Option<NaiveDateTime>,
-    pub active_job_id: Option<i32>,
-    pub uptime_sec: Option<i32>,
-    pub load_avg: Option<Vec<Option<f32>>>,
-    pub last_error: Option<String>,
-}
-*/
 
 // ===== CRUD =====
 #[post("/worker-status", format = "json", data = "<new_status>")]
