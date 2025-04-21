@@ -1,20 +1,14 @@
 use crate::api::DbConn;
+use crate::database::models::user::User;
 use crate::database::models::worker::{NewWorkerStatus, WorkerStatus};
-use crate::database::repositories::{
-    JobAssignmentRepository, JobMetricRepository, JobRepository, JobResultRepository,
-    LogEntryRepository, UserRepository, WorkerRepository, WorkerStatusRepository,
-};
-use crate::shared::{enums::system::CoreEvent, enums::workers::WorkerStatusEnum, SharedResources};
-
+use crate::database::repositories::WorkerStatusRepository;
+use crate::shared::enums::workers::WorkerStatusEnum;
 use chrono::NaiveDateTime;
 use rocket::http::Status;
 use rocket::response::status::{Custom, NoContent};
 use rocket::serde::json::{json, Json, Value};
-use rocket::{delete, get, post, put, routes, Build, Rocket, Route, Shutdown};
-use rocket_db_pools::{Connection, Database};
-use std::env;
-use std::sync::Arc;
-use tokio::sync::{broadcast::error::RecvError, mpsc, RwLock};
+use rocket::{delete, get, post, put, routes, Route};
+use rocket_db_pools::Connection;
 
 // === Mount routes ===
 pub fn routes() -> Vec<Route> {
@@ -52,12 +46,12 @@ pub fn routes() -> Vec<Route> {
 
 ======================================================================== */
 
-
 // ===== CRUD =====
 #[post("/worker-status", format = "json", data = "<new_status>")]
 pub async fn create_worker_status(
     mut conn: Connection<DbConn>,
     new_status: Json<NewWorkerStatus>,
+    _user: User,
 ) -> Result<Custom<Json<WorkerStatus>>, Custom<Json<Value>>> {
     WorkerStatusRepository::create(&mut conn, new_status.into_inner())
         .await
@@ -74,6 +68,7 @@ pub async fn create_worker_status(
 pub async fn get_worker_status_by_id(
     mut conn: Connection<DbConn>,
     id: i32,
+    _user: User,
 ) -> Result<Json<WorkerStatus>, Custom<Json<Value>>> {
     WorkerStatusRepository::find_by_id(&mut conn, id)
         .await
@@ -85,6 +80,7 @@ pub async fn get_worker_status_by_id(
 pub async fn delete_worker_status(
     mut conn: Connection<DbConn>,
     id: i32,
+    _user: User,
 ) -> Result<NoContent, Custom<Json<Value>>> {
     WorkerStatusRepository::delete_worker_status(&mut conn, id)
         .await
@@ -102,6 +98,7 @@ pub async fn delete_worker_status(
 pub async fn get_status_by_worker_id(
     mut conn: Connection<DbConn>,
     worker_id: i32,
+    _user: User,
 ) -> Result<Json<Option<WorkerStatus>>, Custom<Json<Value>>> {
     WorkerStatusRepository::find_by_worker_id(&mut conn, worker_id)
         .await
@@ -120,6 +117,7 @@ pub async fn update_status(
     mut conn: Connection<DbConn>,
     id: i32,
     status: Json<WorkerStatusEnum>,
+    _user: User,
 ) -> Result<Custom<Json<WorkerStatus>>, Custom<Json<Value>>> {
     WorkerStatusRepository::update_status(&mut conn, id, status.into_inner())
         .await
@@ -137,6 +135,7 @@ pub async fn update_last_heartbeat(
     mut conn: Connection<DbConn>,
     id: i32,
     hb: Json<NaiveDateTime>,
+    _user: User,
 ) -> Result<Custom<Json<WorkerStatus>>, Custom<Json<Value>>> {
     WorkerStatusRepository::update_last_heartbeat(&mut conn, id, hb.into_inner())
         .await
@@ -158,6 +157,7 @@ pub async fn update_active_job_id(
     mut conn: Connection<DbConn>,
     id: i32,
     job_id: Json<Option<i32>>,
+    _user: User,
 ) -> Result<Custom<Json<WorkerStatus>>, Custom<Json<Value>>> {
     WorkerStatusRepository::update_active_job_id(&mut conn, id, job_id.into_inner())
         .await
@@ -175,6 +175,7 @@ pub async fn update_uptime(
     mut conn: Connection<DbConn>,
     id: i32,
     uptime: Json<Option<i32>>,
+    _user: User,
 ) -> Result<Custom<Json<WorkerStatus>>, Custom<Json<Value>>> {
     WorkerStatusRepository::update_uptime(&mut conn, id, uptime.into_inner())
         .await
@@ -192,6 +193,7 @@ pub async fn update_load_avg(
     mut conn: Connection<DbConn>,
     id: i32,
     load_avg: Json<Option<Vec<f32>>>,
+    _user: User,
 ) -> Result<Custom<Json<WorkerStatus>>, Custom<Json<Value>>> {
     WorkerStatusRepository::update_load_avg(&mut conn, id, load_avg.into_inner())
         .await
@@ -213,6 +215,7 @@ pub async fn update_last_error(
     mut conn: Connection<DbConn>,
     id: i32,
     last_error: Json<Option<String>>,
+    _user: User,
 ) -> Result<Custom<Json<WorkerStatus>>, Custom<Json<Value>>> {
     WorkerStatusRepository::update_last_error(&mut conn, id, last_error.into_inner())
         .await

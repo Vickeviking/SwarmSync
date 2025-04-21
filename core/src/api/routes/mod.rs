@@ -1,3 +1,4 @@
+pub mod authorization;
 pub mod job;
 pub mod job_assignment;
 pub mod job_metric;
@@ -19,6 +20,7 @@ pub fn all_routes() -> Vec<Route> {
         user::routes(),
         worker::routes(),
         worker_status::routes(),
+        authorization::routes(),
     ]
     .concat()
 }

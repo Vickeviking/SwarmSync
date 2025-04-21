@@ -1,43 +1,13 @@
-/**
-==================================
-🛠️ Supported Actions JobAssignment
-==================================
-
-== CRUD ==
-• `POST /assignments`        → create(NewJobAssignment) -> JobAssignment
-• `GET /assignments/:id`     → find_by_id(id) -> JobAssignment
-• `DELETE /assignments/:id`  → delete(id) -> usize
-
-== Lookup & Search ==
-• `GET /assignments/by_job/:job_id`             → find_by_job_id(job_id) -> Vec<JobAssignment>
-• `GET /assignments/by_worker/:worker_id`       → find_by_worker_id(worker_id) -> Vec<JobAssignment>
-• `GET /assignments/lookup/:job_id/:worker_id`  → find_assignment_by_job_and_worker(job_id, worker_id) -> Option<JobAssignment>
-• `GET /assignments/by_worker/range`            → find_assignments_for_worker_in_time_range(worker_id, start, end) -> Vec<JobAssignment>
-
-== State Updates ==
-• `PATCH /assignments/:id/started`   → update_started_at(id, started_at) -> JobAssignment
-• `PATCH /assignments/:id/finished`  → update_finished_at(id, finished_at) -> JobAssignment
-
-== Filtering / Status ==
-• `GET /assignments/active` → list_active_assignments() -> Vec<JobAssignment>
-*/
-use diesel::dsl::now;
-use diesel::dsl::IntervalDsl;
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
 use crate::database::models::job::{
-    Job, JobAssignment, JobMetric, JobResult, NewJob, NewJobAssignment, NewJobMetric, NewJobResult,
+    JobAssignment, NewJobAssignment,
 };
 
-use crate::shared::enums::{
-    image_format::ImageFormatEnum,
-    job::{JobScheduleEnum, JobStateEnum},
-    schedule::ScheduleTypeEnum,
-};
 
 use crate::database::schema::*;
-use diesel::dsl::count_star;
+
 
 use chrono::NaiveDateTime;
 

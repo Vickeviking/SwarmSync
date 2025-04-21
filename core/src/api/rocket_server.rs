@@ -1,27 +1,28 @@
 use crate::api::routes;
-use crate::api::DbConn;
-use crate::database::repositories::{
-    JobAssignmentRepository, JobMetricRepository, JobRepository, JobResultRepository,
-    LogEntryRepository, UserRepository, WorkerRepository, WorkerStatusRepository,
-};
+use crate::api::{CacheConn, Cors, DbConn};
 use crate::shared::{enums::system::CoreEvent, SharedResources};
 
-use rocket::{Build, Rocket, Shutdown};
+use rocket::{Build, Rocket};
 use rocket_db_pools::Database;
 use std::env;
 use std::sync::Arc;
-use tokio::sync::{broadcast::error::RecvError, mpsc, RwLock};
+use tokio::sync::broadcast::error::RecvError;
 
 pub async fn build_rocket(shared: Arc<SharedResources>) -> Rocket<Build> {
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-
+    let redis_url = env::var("REDIS_URL").expect("REDIS URL must be set");
     // Merge database URL into Rocket's config
-    let figment = rocket::Config::figment().merge(("databases.postgres.url", database_url.clone()));
+    let figment = rocket::Config::figment()
+        .merge(("databases.postgres.url", database_url.clone()))
+        .merge(("databases.redis.url", redis_url.clone()));
 
-    // You could optionally print figment config:
-    println!("[Rocket] Loaded figment config with DB URL: {database_url}");
+    println!(
+        "[Rocket] Loaded figment config with DB URL: {database_url} and Redis URL: {redis_url}"
+    );
 
     rocket::custom(figment)
+        .attach(Cors)
+        .attach(CacheConn::init())
         .attach(DbConn::init())
         .manage(shared)
         .mount("/", routes::all_routes())

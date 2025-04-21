@@ -35,7 +35,7 @@ pub struct Job {
     pub updated_at: NaiveDateTime,
 }
 
-#[derive(Debug, Insertable, Deserialize)]
+#[derive(Debug, Insertable, Deserialize, Serialize)]
 #[diesel(table_name = jobs)]
 pub struct NewJob {
     pub user_id: i32,
@@ -48,6 +48,7 @@ pub struct NewJob {
     pub schedule_type: ScheduleTypeEnum,
     pub cron_expression: Option<String>,
     pub notes: Option<String>,
+    pub state: JobStateEnum,
 }
 
 #[derive(Debug, Serialize, Deserialize, Queryable, Identifiable, Associations)]

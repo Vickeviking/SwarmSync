@@ -1,16 +1,8 @@
-pub mod api;
-pub mod core;
-pub mod database;
-pub mod modules;
-pub mod services;
-pub mod shared;
-pub mod utils;
-
-use crate::core::PulseBroadcaster;
-use crate::core::{ModuleInitializer, ServiceInitializer};
-use crate::services::{ServiceChannels, ServiceWiring};
-use crate::shared::{enums::system::CoreEvent, SharedResources};
-use crate::utils::Logger;
+use swarmsync_core::core::PulseBroadcaster;
+use swarmsync_core::core::{ModuleInitializer, ServiceInitializer};
+use swarmsync_core::services::{ServiceChannels, ServiceWiring};
+use swarmsync_core::shared::{enums::system::CoreEvent, SharedResources};
+use swarmsync_core::utils::Logger;
 
 use std::sync::Arc;
 use tokio::runtime::Runtime;

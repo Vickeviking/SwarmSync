@@ -1,19 +1,13 @@
 use crate::database::models::job::{JobMetric, NewJobMetric};
-use crate::database::repositories::{
-    JobAssignmentRepository, JobMetricRepository, JobRepository, JobResultRepository,
-    LogEntryRepository, UserRepository, WorkerRepository, WorkerStatusRepository,
-};
-use crate::shared::{enums::system::CoreEvent, SharedResources};
+use crate::database::models::user::User;
+use crate::database::repositories::JobMetricRepository;
 
 use crate::api::DbConn;
 use rocket::http::Status;
-use rocket::response::status::{Custom, NoContent};
+use rocket::response::status::Custom;
 use rocket::serde::json::{json, Json, Value};
-use rocket::{delete, get, post, routes, Build, Rocket, Route, Shutdown};
-use rocket_db_pools::{Connection, Database};
-use std::env;
-use std::sync::Arc;
-use tokio::sync::{broadcast::error::RecvError, mpsc, RwLock};
+use rocket::{delete, get, post, routes, Route};
+use rocket_db_pools::Connection;
 
 pub fn routes() -> Vec<Route> {
     routes![
@@ -49,6 +43,7 @@ pub fn routes() -> Vec<Route> {
 pub async fn create_metric(
     mut db: Connection<DbConn>,
     new_metric: Json<NewJobMetric>,
+    _user: User,
 ) -> Result<Custom<Json<JobMetric>>, Custom<Json<serde_json::Value>>> {
     JobMetricRepository::create(&mut db, new_metric.into_inner())
         .await
@@ -65,6 +60,7 @@ pub async fn create_metric(
 pub async fn get_metric(
     mut db: Connection<DbConn>,
     id: i32,
+    _user: User,
 ) -> Result<Json<JobMetric>, Custom<Json<serde_json::Value>>> {
     JobMetricRepository::find_by_id(&mut db, id)
         .await
@@ -76,6 +72,7 @@ pub async fn get_metric(
 pub async fn delete_job(
     mut db: Connection<DbConn>,
     id: i32,
+    _user: User,
 ) -> Result<Status, Custom<Json<serde_json::Value>>> {
     JobMetricRepository::delete(&mut db, id)
         .await
@@ -93,6 +90,7 @@ pub async fn delete_job(
 pub async fn get_metrics_by_job_id(
     mut db: Connection<DbConn>,
     job_id: i32,
+    _user: User,
 ) -> Result<Json<Vec<JobMetric>>, Custom<Value>> {
     JobMetricRepository::find_by_job_id(&mut db, job_id)
         .await
@@ -109,6 +107,7 @@ pub async fn get_metrics_by_job_id(
 pub async fn get_metrics_by_worker_id(
     mut db: Connection<DbConn>,
     worker_id: i32,
+    _user: User,
 ) -> Result<Json<Vec<JobMetric>>, Custom<Value>> {
     JobMetricRepository::find_by_worker_id(&mut db, worker_id)
         .await
@@ -125,6 +124,7 @@ pub async fn get_metrics_by_worker_id(
 pub async fn get_most_recent_for_job(
     mut db: Connection<DbConn>,
     job_id: i32,
+    _user: User,
 ) -> Result<Json<Option<JobMetric>>, Custom<Value>> {
     JobMetricRepository::get_most_recent_for_job(&mut db, job_id)
         .await
@@ -141,6 +141,7 @@ pub async fn get_most_recent_for_job(
 pub async fn list_metrics_for_job(
     mut db: Connection<DbConn>,
     job_id: i32,
+    _user: User,
 ) -> Result<Json<Vec<JobMetric>>, Custom<Value>> {
     JobMetricRepository::list_metrics_for_job(&mut db, job_id)
         .await
@@ -157,6 +158,7 @@ pub async fn list_metrics_for_job(
 pub async fn get_metrics_worker_stream(
     mut db: Connection<DbConn>,
     worker_id: i32,
+    _user: User,
 ) -> Result<Json<Vec<JobMetric>>, Custom<Value>> {
     JobMetricRepository::get_metrics_by_worker(&mut db, worker_id)
         .await

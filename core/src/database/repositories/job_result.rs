@@ -18,25 +18,16 @@
 • `PATCH /results/:id/files`         → update_files(id, new_files) -> JobResult
 */
 
-use diesel::dsl::now;
-use diesel::dsl::IntervalDsl;
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
 use crate::database::models::job::{
-    Job, JobAssignment, JobMetric, JobResult, NewJob, NewJobAssignment, NewJobMetric, NewJobResult,
+    JobResult, NewJobResult,
 };
 
-use crate::shared::enums::{
-    image_format::ImageFormatEnum,
-    job::{JobScheduleEnum, JobStateEnum},
-    schedule::ScheduleTypeEnum,
-};
 
 use crate::database::schema::*;
-use diesel::dsl::count_star;
 
-use chrono::NaiveDateTime;
 
 pub struct JobResultRepository;
 

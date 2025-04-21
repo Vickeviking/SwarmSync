@@ -4,7 +4,7 @@ use crate::database::models::log::{
 };
 use crate::shared::enums::log::{LogActionEnum, LogLevelEnum};
 use crate::shared::enums::system::{CoreEvent, Pulse, SystemModuleEnum};
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use std::sync::Arc;
 use tokio::select;
 use tokio::sync::{broadcast::Receiver, Mutex, RwLock};
@@ -118,7 +118,7 @@ impl Logger {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 
     #[tokio::test]
     async fn test_logger_initialization() {

@@ -1,20 +1,15 @@
 use crate::api::DbConn;
 use crate::database::models::job::{Job, NewJob};
-use crate::database::repositories::{
-    JobAssignmentRepository, JobMetricRepository, JobRepository, JobResultRepository,
-    LogEntryRepository, UserRepository, WorkerRepository, WorkerStatusRepository,
-};
-use crate::shared::enums::job::JobStateEnum;
-use crate::shared::{enums::system::CoreEvent, SharedResources};
+use crate::database::models::user::User;
+use crate::database::repositories::JobRepository;
 
 use rocket::http::Status;
-use rocket::response::status::{Custom, NoContent};
+use rocket::response::status::Custom;
 use rocket::serde::json::{json, Json, Value};
-use rocket::{delete, get, patch, post, routes, Build, Rocket, Route, Shutdown};
+use rocket::{delete, get, patch, post, routes, Route};
 
 use chrono::{NaiveDateTime, Utc};
-use rocket_db_pools::{Connection, Database};
-use tokio::sync::{broadcast::error::RecvError, mpsc, RwLock};
+use rocket_db_pools::Connection;
 
 pub fn routes() -> Vec<Route> {
     routes![
@@ -83,6 +78,7 @@ pub fn routes() -> Vec<Route> {
 pub async fn create_job(
     mut db: Connection<DbConn>,
     new_job: Json<NewJob>,
+    _user: User,
 ) -> Result<Custom<Json<Job>>, Custom<Json<serde_json::Value>>> {
     JobRepository::create(&mut db, new_job.into_inner())
         .await
@@ -99,6 +95,7 @@ pub async fn create_job(
 pub async fn get_job(
     mut db: Connection<DbConn>,
     id: i32,
+    _user: User,
 ) -> Result<Json<Job>, Custom<Json<serde_json::Value>>> {
     JobRepository::find_by_id(&mut db, id)
         .await
@@ -111,6 +108,7 @@ pub async fn update_job(
     mut db: Connection<DbConn>,
     id: i32,
     job: Json<Job>,
+    _user: User,
 ) -> Result<Json<Job>, Custom<Json<serde_json::Value>>> {
     JobRepository::update(&mut db, id, job.into_inner())
         .await
@@ -127,6 +125,7 @@ pub async fn update_job(
 pub async fn delete_job(
     mut db: Connection<DbConn>,
     id: i32,
+    _user: User,
 ) -> Result<Status, Custom<Json<serde_json::Value>>> {
     JobRepository::delete(&mut db, id)
         .await
@@ -145,6 +144,7 @@ pub async fn search_jobs(
     mut db: Connection<DbConn>,
     user_id: i32,
     query: &str,
+    _user: User,
 ) -> Result<Json<Vec<Job>>, Custom<Value>> {
     JobRepository::search_by_job_name(&mut db, user_id, query)
         .await
@@ -162,6 +162,7 @@ pub async fn find_job_by_name(
     mut db: Connection<DbConn>,
     user_id: i32,
     name: &str,
+    _user: User,
 ) -> Result<Json<Vec<Job>>, Custom<Value>> {
     JobRepository::search_by_job_name(&mut db, user_id, name)
         .await
@@ -175,6 +176,7 @@ pub async fn list_jobs_by_admin(
     user_id: i32,
     limit: Option<i64>,
     offset: Option<i64>,
+    _user: User,
 ) -> Result<Json<Vec<Job>>, Custom<Value>> {
     let limit = limit.unwrap_or(50);
     let offset = offset.unwrap_or(0);
@@ -194,6 +196,7 @@ pub async fn list_jobs_by_admin(
 pub async fn list_jobs_by_state(
     mut db: Connection<DbConn>,
     state: String,
+    _user: User,
 ) -> Result<Json<Vec<Job>>, Custom<Value>> {
     let enum_state = state
         .parse()
@@ -208,6 +211,7 @@ pub async fn list_jobs_by_state(
 pub async fn get_recent_jobs(
     mut db: Connection<DbConn>,
     limit: Option<i64>,
+    _user: User,
 ) -> Result<Json<Vec<Job>>, Custom<Value>> {
     let limit = limit.unwrap_or(10);
     JobRepository::get_recent_jobs(&mut db, limit)
@@ -225,6 +229,7 @@ pub async fn get_recent_jobs(
 pub async fn get_failed_jobs(
     mut db: Connection<DbConn>,
     limit: Option<i64>,
+    _user: User,
 ) -> Result<Json<Vec<Job>>, Custom<Value>> {
     let limit = limit.unwrap_or(10);
     JobRepository::get_failed_jobs(&mut db, limit)
@@ -243,6 +248,7 @@ pub async fn get_failed_jobs(
 pub async fn mark_job_running(
     mut db: Connection<DbConn>,
     id: i32,
+    _user: User,
 ) -> Result<Json<Job>, Custom<Value>> {
     JobRepository::mark_running(&mut db, id)
         .await
@@ -254,6 +260,7 @@ pub async fn mark_job_running(
 pub async fn mark_job_succeeded(
     mut db: Connection<DbConn>,
     id: i32,
+    _user: User,
 ) -> Result<Json<Job>, Custom<Value>> {
     JobRepository::mark_succeeded(&mut db, id)
         .await
@@ -266,6 +273,7 @@ pub async fn mark_job_failed(
     mut db: Connection<DbConn>,
     id: i32,
     body: Json<Value>,
+    _user: User,
 ) -> Result<Json<Job>, Custom<Value>> {
     let message = body
         .get("message")
@@ -284,6 +292,7 @@ pub async fn mark_job_failed(
 #[get("/jobs/scheduled")]
 pub async fn list_scheduled_jobs(
     mut db: Connection<DbConn>,
+    _user: User,
 ) -> Result<Json<Vec<Job>>, Custom<Value>> {
     JobRepository::list_scheduled_jobs(&mut db)
         .await
@@ -301,6 +310,7 @@ pub async fn list_due_cron_jobs(
     mut db: Connection<DbConn>,
     date: String,
     time: String,
+    _user: User,
 ) -> Result<Json<Vec<Job>>, Custom<Value>> {
     let current_time: NaiveDateTime =
         NaiveDateTime::parse_from_str(&date, &time).unwrap_or(Utc::now().naive_utc());
@@ -311,7 +321,10 @@ pub async fn list_due_cron_jobs(
 }
 
 #[get("/jobs/ready")]
-pub async fn list_ready_jobs(mut db: Connection<DbConn>) -> Result<Json<Vec<Job>>, Custom<Value>> {
+pub async fn list_ready_jobs(
+    mut db: Connection<DbConn>,
+    _user: User,
+) -> Result<Json<Vec<Job>>, Custom<Value>> {
     JobRepository::list_one_time_jobs_ready(&mut db)
         .await
         .map(Json)
@@ -327,6 +340,7 @@ pub async fn list_ready_jobs(mut db: Connection<DbConn>) -> Result<Json<Vec<Job>
 #[get("/jobs/stats/admins")]
 pub async fn get_admin_job_counts(
     mut db: Connection<DbConn>,
+    _user: User,
 ) -> Result<Json<Vec<(i32, i64)>>, Custom<Value>> {
     JobRepository::get_job_counts_per_admin(&mut db)
         .await
@@ -344,6 +358,7 @@ pub async fn get_admin_job_counts(
 pub async fn get_active_jobs_for_worker(
     mut db: Connection<DbConn>,
     worker_id: i32,
+    _user: User,
 ) -> Result<Json<Vec<Job>>, Custom<Value>> {
     JobRepository::get_active_jobs_for_worker(&mut db, worker_id)
         .await
@@ -360,6 +375,7 @@ pub async fn get_active_jobs_for_worker(
 pub async fn get_jobs_assigned_to_worker(
     mut db: Connection<DbConn>,
     worker_id: i32,
+    _user: User,
 ) -> Result<Json<Vec<Job>>, Custom<Value>> {
     JobRepository::find_jobs_assigned_to_worker(&mut db, worker_id)
         .await
@@ -375,6 +391,7 @@ pub async fn get_jobs_assigned_to_worker(
 #[get("/jobs/unassigned")]
 pub async fn list_jobs_with_no_assignment(
     mut db: Connection<DbConn>,
+    _user: User,
 ) -> Result<Json<Vec<Job>>, Custom<Value>> {
     JobRepository::list_jobs_with_no_assignment(&mut db)
         .await

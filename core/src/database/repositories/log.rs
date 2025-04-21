@@ -26,10 +26,9 @@
 • `HEAD /logs/exists?level=info`  → exists_by_level(level) -> bool
 */
 
-use crate::database::models::log::{DBLogEntry, LogEntry, NewDBLogEntry};
+use crate::database::models::log::{DBLogEntry, NewDBLogEntry};
 use crate::database::schema::logs;
-use crate::shared::enums::{log::LogActionEnum, log::LogLevelEnum, system::SystemModuleEnum};
-use diesel::dsl::now;
+use crate::shared::enums::system::SystemModuleEnum;
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 

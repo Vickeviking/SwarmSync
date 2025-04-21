@@ -1,19 +1,12 @@
 use crate::api::DbConn;
 use crate::database::models::job::{JobResult, NewJobResult};
-use crate::database::repositories::{
-    JobAssignmentRepository, JobMetricRepository, JobRepository, JobResultRepository,
-    LogEntryRepository, UserRepository, WorkerRepository, WorkerStatusRepository,
-};
-use crate::shared::{enums::system::CoreEvent, SharedResources};
-
+use crate::database::models::user::User;
+use crate::database::repositories::JobResultRepository;
 use rocket::http::Status;
-use rocket::response::status::{Custom, NoContent};
-use rocket::serde::json::{json, Json, Value};
-use rocket::{delete, get, patch, post, routes, Build, Rocket, Route, Shutdown};
-use rocket_db_pools::{Connection, Database};
-use std::env;
-use std::sync::Arc;
-use tokio::sync::{broadcast::error::RecvError, mpsc, RwLock};
+use rocket::response::status::Custom;
+use rocket::serde::json::{json, Json};
+use rocket::{delete, get, patch, post, routes, Route};
+use rocket_db_pools::Connection;
 
 pub fn routes() -> Vec<Route> {
     routes![
@@ -51,6 +44,7 @@ pub fn routes() -> Vec<Route> {
 pub async fn create_result(
     mut db: Connection<DbConn>,
     new_result: Json<NewJobResult>,
+    _user: User,
 ) -> Result<Custom<Json<JobResult>>, Custom<Json<serde_json::Value>>> {
     JobResultRepository::create(&mut db, new_result.into_inner())
         .await
@@ -67,6 +61,7 @@ pub async fn create_result(
 pub async fn get_result(
     mut db: Connection<DbConn>,
     id: i32,
+    _user: User,
 ) -> Result<Json<JobResult>, Custom<Json<serde_json::Value>>> {
     JobResultRepository::find_by_id(&mut db, id)
         .await
@@ -78,6 +73,7 @@ pub async fn get_result(
 pub async fn delete_result(
     mut db: Connection<DbConn>,
     id: i32,
+    _user: User,
 ) -> Result<Status, Custom<Json<serde_json::Value>>> {
     JobResultRepository::delete(&mut db, id)
         .await
@@ -95,6 +91,7 @@ pub async fn delete_result(
 pub async fn get_results_by_job_id(
     mut db: Connection<DbConn>,
     job_id: i32,
+    _user: User,
 ) -> Result<Json<Vec<JobResult>>, Custom<Json<serde_json::Value>>> {
     JobResultRepository::find_by_job_id(&mut db, job_id)
         .await
@@ -111,6 +108,7 @@ pub async fn get_results_by_job_id(
 pub async fn list_results_for_job(
     mut db: Connection<DbConn>,
     job_id: i32,
+    _user: User,
 ) -> Result<Json<Vec<JobResult>>, Custom<Json<serde_json::Value>>> {
     JobResultRepository::list_results_for_job(&mut db, job_id)
         .await
@@ -127,6 +125,7 @@ pub async fn list_results_for_job(
 pub async fn get_most_recent_result_for_job(
     mut db: Connection<DbConn>,
     job_id: i32,
+    _user: User,
 ) -> Result<Json<Option<JobResult>>, Custom<Json<serde_json::Value>>> {
     JobResultRepository::get_most_recent_for_job(&mut db, job_id)
         .await
@@ -145,6 +144,7 @@ pub async fn update_stdout(
     mut db: Connection<DbConn>,
     id: i32,
     new_stdout: Json<Option<String>>,
+    _user: User,
 ) -> Result<Json<JobResult>, Custom<Json<serde_json::Value>>> {
     JobResultRepository::update_stdout(&mut db, id, new_stdout.into_inner())
         .await
@@ -162,6 +162,7 @@ pub async fn update_files(
     mut db: Connection<DbConn>,
     id: i32,
     new_files: Json<Option<Vec<String>>>,
+    _user: User,
 ) -> Result<Json<JobResult>, Custom<Json<serde_json::Value>>> {
     JobResultRepository::update_files(&mut db, id, new_files.into_inner())
         .await

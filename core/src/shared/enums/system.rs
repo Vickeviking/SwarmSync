@@ -1,10 +1,9 @@
 use diesel::deserialize::{FromSql, FromSqlRow};
 use diesel::expression::AsExpression;
 use diesel::pg::{Pg, PgValue};
-use diesel::serialize::{Output, ToSql};
+use diesel::serialize::ToSql;
 use diesel::sql_types::Text;
 use serde::{Deserialize, Serialize};
-use std::hash;
 use std::io::Write;
 use std::str::FromStr;
 

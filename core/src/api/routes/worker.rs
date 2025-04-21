@@ -1,21 +1,14 @@
 use crate::api::DbConn;
 use crate::database::models::worker::{NewWorker, Worker};
-use crate::database::repositories::{
-    JobAssignmentRepository, JobMetricRepository, JobRepository, JobResultRepository,
-    LogEntryRepository, UserRepository, WorkerRepository, WorkerStatusRepository,
-};
+use crate::database::repositories::WorkerRepository;
 
-use crate::shared::{enums::system::CoreEvent, SharedResources};
-
+use crate::database::models::user::User;
 use chrono::NaiveDateTime;
 use rocket::http::Status;
 use rocket::response::status::{Custom, NoContent};
 use rocket::serde::json::{json, Json, Value};
-use rocket::{delete, get, post, put, routes, Build, Rocket, Route, Shutdown};
-use rocket_db_pools::{Connection, Database};
-use std::env;
-use std::sync::Arc;
-use tokio::sync::{broadcast::error::RecvError, mpsc, RwLock};
+use rocket::{delete, get, post, put, routes, Route};
+use rocket_db_pools::Connection;
 
 // === Mount routes ===
 pub fn routes() -> Vec<Route> {
@@ -54,6 +47,7 @@ pub fn routes() -> Vec<Route> {
 pub async fn create_worker(
     mut conn: Connection<DbConn>,
     new_worker: Json<NewWorker>,
+    _user: User,
 ) -> Result<Custom<Json<Worker>>, Custom<Json<Value>>> {
     WorkerRepository::create(&mut conn, new_worker.into_inner())
         .await
@@ -70,6 +64,7 @@ pub async fn create_worker(
 pub async fn get_worker_by_id(
     mut conn: Connection<DbConn>,
     id: i32,
+    _user: User,
 ) -> Result<Json<Worker>, Custom<Json<Value>>> {
     WorkerRepository::find_by_id(&mut conn, id)
         .await
@@ -81,6 +76,7 @@ pub async fn get_worker_by_id(
 pub async fn delete_worker(
     mut conn: Connection<DbConn>,
     id: i32,
+    _user: User,
 ) -> Result<NoContent, Custom<Json<Value>>> {
     WorkerRepository::delete_worker(&mut conn, id)
         .await
@@ -98,6 +94,7 @@ pub async fn delete_worker(
 pub async fn get_workers_by_admin(
     mut conn: Connection<DbConn>,
     admin_id: i32,
+    _user: User,
 ) -> Result<Custom<Json<Vec<Worker>>>, Custom<Json<Value>>> {
     WorkerRepository::find_by_admin_id(&mut conn, admin_id)
         .await
@@ -114,6 +111,7 @@ pub async fn get_workers_by_admin(
 pub async fn find_worker_by_label(
     mut conn: Connection<DbConn>,
     label: String,
+    _user: User,
 ) -> Result<Json<Option<Worker>>, Custom<Json<Value>>> {
     WorkerRepository::find_by_label(&mut conn, &label)
         .await
@@ -130,6 +128,7 @@ pub async fn find_worker_by_label(
 pub async fn find_worker_by_ip(
     mut conn: Connection<DbConn>,
     ip_address: String,
+    _user: User,
 ) -> Result<Json<Option<Worker>>, Custom<Json<Value>>> {
     WorkerRepository::find_by_ip_address(&mut conn, &ip_address)
         .await
@@ -148,6 +147,7 @@ pub async fn list_workers_by_admin(
     admin_id: i32,
     page: Option<u32>,
     limit: Option<u32>,
+    _user: User,
 ) -> Result<Custom<Json<Vec<Worker>>>, Custom<Json<Value>>> {
     let limit = limit.unwrap_or(50);
     let offset = page.unwrap_or(0) as i64 * limit as i64;
@@ -168,6 +168,7 @@ pub async fn update_last_seen(
     mut conn: Connection<DbConn>,
     id: i32,
     new_last_seen: Json<NaiveDateTime>,
+    _user: User,
 ) -> Result<Custom<Json<Worker>>, Custom<Json<Value>>> {
     WorkerRepository::update_last_seen_at(&mut conn, id, new_last_seen.into_inner())
         .await

@@ -16,14 +16,11 @@
 
 */
 
-use diesel::dsl::now;
-use diesel::dsl::IntervalDsl;
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
-use crate::database::models::worker::{NewWorker, NewWorkerStatus, Worker, WorkerStatus};
+use crate::database::models::worker::{NewWorker, Worker};
 use crate::database::schema::*;
-use crate::shared::enums::workers::WorkerStatusEnum;
 use chrono::NaiveDateTime;
 
 pub struct WorkerRepository;

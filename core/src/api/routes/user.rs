@@ -1,19 +1,14 @@
+use crate::api::auth;
 use crate::api::DbConn;
-use crate::database::models::user::{NewUser, User};
-use crate::database::repositories::{
-    JobAssignmentRepository, JobMetricRepository, JobRepository, JobResultRepository,
-    LogEntryRepository, UserRepository, WorkerRepository, WorkerStatusRepository,
+use crate::database::models::user::{
+    NewUser, NewUserRequest, UpdateUserRequest, User, UserResponse,
 };
-use crate::shared::{enums::system::CoreEvent, SharedResources};
-
+use crate::database::repositories::UserRepository;
 use rocket::http::Status;
 use rocket::response::status::{Custom, NoContent};
 use rocket::serde::json::{json, Json, Value};
-use rocket::{delete, get, head, post, put, routes, Build, Rocket, Route, Shutdown};
-use rocket_db_pools::{Connection, Database};
-use std::env;
-use std::sync::Arc;
-use tokio::sync::{broadcast::error::RecvError, mpsc, RwLock};
+use rocket::{delete, get, head, post, put, routes, Route};
+use rocket_db_pools::Connection;
 
 pub fn routes() -> Vec<Route> {
     routes![
@@ -67,6 +62,7 @@ pub fn routes() -> Vec<Route> {
 pub async fn get_user_by_id(
     mut conn: Connection<DbConn>,
     id: i32,
+    _user: User,
 ) -> Result<Json<User>, Custom<Json<Value>>> {
     UserRepository::find_by_id(&mut conn, id)
         .await
@@ -74,14 +70,45 @@ pub async fn get_user_by_id(
         .map_err(|e| Custom(Status::NotFound, Json(json!({"error": e.to_string()}))))
 }
 
-#[post("/users", format = "json", data = "<new_user>")]
+#[post("/users", format = "json", data = "<new_user_req>")]
 pub async fn create_user(
     mut conn: Connection<DbConn>,
-    new_user: Json<NewUser>,
-) -> Result<Custom<Json<User>>, Custom<Json<Value>>> {
-    UserRepository::create(&mut conn, new_user.into_inner())
+    new_user_req: Json<NewUserRequest>,
+) -> Result<Custom<Json<UserResponse>>, Custom<Json<Value>>> {
+    // Validate password
+    if !auth::is_password_valid(&new_user_req.password) {
+        return Err(Custom(
+            Status::BadRequest,
+            Json(json!({
+                "error": "Password must be 8–128 characters long and contain both letters and digits."
+            })),
+        ));
+    }
+
+    // Hash password
+    let hashed = match auth::hash_password(new_user_req.password.clone()) {
+        Ok(p) => p,
+        Err(_) => {
+            return Err(Custom(
+                Status::InternalServerError,
+                Json(json!({"error": "Password hashing failed"})),
+            ))
+        }
+    };
+
+    // Construct NewUser properly
+    let new_user = NewUser {
+        username: new_user_req.username.clone(),
+        email: new_user_req.email.clone(),
+        password_hash: hashed,
+    };
+
+    UserRepository::create(&mut conn, new_user)
         .await
-        .map(|u| Custom(Status::Created, Json(u)))
+        .map(|u| {
+            let resp: UserResponse = u.into();
+            Custom(Status::Created, Json(resp))
+        })
         .map_err(|e| {
             Custom(
                 Status::InternalServerError,
@@ -94,6 +121,7 @@ pub async fn create_user(
 pub async fn delete_user(
     mut conn: Connection<DbConn>,
     id: i32,
+    _user: User,
 ) -> Result<NoContent, Custom<Json<Value>>> {
     UserRepository::delete(&mut conn, id)
         .await
@@ -106,21 +134,60 @@ pub async fn delete_user(
         })
 }
 
-#[put("/users/<id>", format = "json", data = "<user>")]
+#[put("/users/<id>", format = "json", data = "<update_req>")]
 pub async fn update_user(
-    mut conn: Connection<DbConn>,
     id: i32,
-    user: Json<User>,
-) -> Result<Custom<Json<User>>, Custom<Json<Value>>> {
-    UserRepository::update(&mut conn, id, user.into_inner())
+    update_req: Json<UpdateUserRequest>,
+    mut conn: Connection<DbConn>,
+) -> Result<Json<UserResponse>, Custom<Json<Value>>> {
+    let user = match UserRepository::find_by_id(&mut conn, id).await {
+        Ok(u) => u,
+        Err(_) => {
+            return Err(Custom(
+                Status::NotFound,
+                Json(json!({"error": "User not found"})),
+            ))
+        }
+    };
+
+    // Hash password if provided
+    let password_hash = if let Some(pwd) = &update_req.password {
+        if !auth::is_password_valid(pwd) {
+            return Err(Custom(
+                Status::BadRequest,
+                Json(json!({
+                    "error": "Password must be 8–128 characters long and contain both letters and digits."
+                })),
+            ));
+        }
+        Some(auth::hash_password(pwd.clone().to_string()).map_err(|_| {
+            Custom(
+                Status::InternalServerError,
+                Json(json!({"error": "Password hashing failed"})),
+            )
+        })?)
+    } else {
+        Some(user.password_hash.clone()) // preserve old one
+    };
+
+    let updated = User {
+        id: user.id,
+        username: update_req.username.clone(),
+        email: update_req.email.clone(),
+        password_hash: password_hash.unwrap(),
+        created_at: user.created_at,
+    };
+
+    let result = UserRepository::update(&mut conn, user.id, updated)
         .await
-        .map(|u| Custom(Status::Ok, Json(u)))
         .map_err(|e| {
             Custom(
                 Status::InternalServerError,
                 Json(json!({"error": e.to_string()})),
             )
-        })
+        })?;
+
+    Ok(Json(result.into()))
 }
 
 // === Lookup ===
@@ -128,22 +195,31 @@ pub async fn update_user(
 pub async fn find_user_by_email(
     mut conn: Connection<DbConn>,
     email: String,
-) -> Result<Json<Option<User>>, Custom<Json<Value>>> {
-    UserRepository::find_by_email(&mut conn, &email)
+    _user: User,
+) -> Result<Json<User>, Custom<Json<Value>>> {
+    let user = UserRepository::find_by_email(&mut conn, &email)
         .await
-        .map(Json)
         .map_err(|e| {
             Custom(
                 Status::InternalServerError,
                 Json(json!({"error": e.to_string()})),
             )
-        })
+        })?;
+
+    match user {
+        Some(user) => Ok(Json(user)),
+        None => Err(Custom(
+            Status::NotFound,
+            Json(json!({"error": "User not found"})),
+        )),
+    }
 }
 
 #[get("/users/username/<username>")]
 pub async fn find_user_by_username(
     mut conn: Connection<DbConn>,
     username: String,
+    _user: User,
 ) -> Result<Json<Option<User>>, Custom<Json<Value>>> {
     UserRepository::find_by_username(&mut conn, &username)
         .await
@@ -161,6 +237,7 @@ pub async fn find_user_by_username(
 pub async fn search_by_username(
     mut conn: Connection<DbConn>,
     q: String,
+    _user: User,
 ) -> Result<Custom<Json<Vec<User>>>, Custom<Json<Value>>> {
     UserRepository::search_by_username(&mut conn, &q)
         .await
@@ -177,6 +254,7 @@ pub async fn search_by_username(
 pub async fn search_by_email(
     mut conn: Connection<DbConn>,
     q: String,
+    _user: User,
 ) -> Result<Custom<Json<Vec<User>>>, Custom<Json<Value>>> {
     UserRepository::search_by_email(&mut conn, &q)
         .await
@@ -195,6 +273,7 @@ pub async fn list_users(
     mut conn: Connection<DbConn>,
     page: Option<u32>,
     limit: Option<u32>,
+    _user: User,
 ) -> Result<Custom<Json<Vec<User>>>, Custom<Json<Value>>> {
     let limit = limit.unwrap_or(50);
     let offset = page.unwrap_or(0) * limit;
@@ -215,6 +294,7 @@ pub async fn list_users(
 pub async fn exists_user_by_email(
     mut conn: Connection<DbConn>,
     email: &str,
+    _user: User,
 ) -> Result<NoContent, Status> {
     match UserRepository::exists_by_email(&mut conn, email).await {
         Ok(true) => Ok(NoContent),
@@ -227,6 +307,7 @@ pub async fn exists_user_by_email(
 pub async fn exists_user_by_username(
     mut conn: Connection<DbConn>,
     username: &str,
+    _user: User,
 ) -> Result<NoContent, Status> {
     match UserRepository::exists_by_username(&mut conn, username).await {
         Ok(true) => Ok(NoContent),
@@ -239,6 +320,7 @@ pub async fn exists_user_by_username(
 #[get("/users/with-jobs")]
 pub async fn users_with_jobs(
     mut conn: Connection<DbConn>,
+    _user: User,
 ) -> Result<Custom<Json<Vec<User>>>, Custom<Json<Value>>> {
     UserRepository::find_users_with_jobs(&mut conn)
         .await
@@ -254,6 +336,7 @@ pub async fn users_with_jobs(
 #[get("/users/job-counts")]
 pub async fn user_job_counts(
     mut conn: Connection<DbConn>,
+    _user: User,
 ) -> Result<Custom<Json<Vec<(User, i64)>>>, Custom<Json<Value>>> {
     UserRepository::get_user_with_job_counts(&mut conn)
         .await

@@ -1,20 +1,14 @@
 use crate::api::DbConn;
-use crate::database::models::log::{DBLogEntry, LogEntry, NewDBLogEntry};
-use crate::database::repositories::{
-    JobAssignmentRepository, JobMetricRepository, JobRepository, JobResultRepository,
-    LogEntryRepository, UserRepository, WorkerRepository, WorkerStatusRepository,
-};
-use crate::shared::{enums::system::CoreEvent, enums::system::SystemModuleEnum, SharedResources};
-
+use crate::database::models::log::{DBLogEntry, NewDBLogEntry};
+use crate::database::models::user::User;
+use crate::database::repositories::LogEntryRepository;
+use crate::shared::enums::system::SystemModuleEnum;
 use rocket::http::Status;
 use rocket::response::status::{Custom, NoContent};
 use rocket::serde::json::{json, Json, Value};
-use rocket::{delete, get, head, patch, post, put, routes, Build, Rocket, Route, Shutdown};
-use rocket_db_pools::{Connection, Database};
-use std::env;
+use rocket::{delete, get, head, post, put, routes, Route};
+use rocket_db_pools::Connection;
 use std::str::FromStr;
-use std::sync::Arc;
-use tokio::sync::{broadcast::error::RecvError, mpsc, RwLock};
 
 pub fn routes() -> Vec<Route> {
     routes![
@@ -60,6 +54,7 @@ pub fn routes() -> Vec<Route> {
 pub async fn create_log_entry(
     mut conn: Connection<DbConn>,
     entry: Json<NewDBLogEntry>,
+    _user: User,
 ) -> Result<Custom<Json<DBLogEntry>>, Custom<Json<serde_json::Value>>> {
     LogEntryRepository::create(&mut conn, entry.into_inner())
         .await
@@ -76,6 +71,7 @@ pub async fn create_log_entry(
 pub async fn get_log_entry_by_id(
     mut conn: Connection<DbConn>,
     id: i32,
+    _user: User,
 ) -> Result<Json<DBLogEntry>, Custom<Json<serde_json::Value>>> {
     LogEntryRepository::find_by_id(&mut conn, id)
         .await
@@ -87,6 +83,7 @@ pub async fn get_log_entry_by_id(
 pub async fn delete_log_entry(
     mut conn: Connection<DbConn>,
     id: i32,
+    _user: User,
 ) -> Result<NoContent, Custom<Value>> {
     LogEntryRepository::delete(&mut conn, id)
         .await
@@ -99,6 +96,7 @@ pub async fn update_log_entry(
     mut conn: Connection<DbConn>,
     id: i32,
     entry: Json<DBLogEntry>,
+    _user: User,
 ) -> Result<Custom<Json<DBLogEntry>>, Custom<Json<serde_json::Value>>> {
     LogEntryRepository::update(&mut conn, id, entry.into_inner())
         .await
@@ -117,6 +115,7 @@ pub async fn update_log_entry(
 pub async fn search_by_level(
     mut conn: Connection<DbConn>,
     q: String,
+    _user: User,
 ) -> Result<Custom<Json<Vec<DBLogEntry>>>, Custom<Json<serde_json::Value>>> {
     LogEntryRepository::search_by_level(&mut conn, &q)
         .await
@@ -133,6 +132,7 @@ pub async fn search_by_level(
 pub async fn find_logs_by_module(
     mut conn: Connection<DbConn>,
     q: String,
+    _user: User,
 ) -> Result<Custom<Json<Vec<DBLogEntry>>>, Custom<Json<serde_json::Value>>> {
     let parsed = SystemModuleEnum::from_str(&q).map_err(|_| {
         Custom(
@@ -156,6 +156,7 @@ pub async fn find_logs_by_module(
 pub async fn search_by_action(
     mut conn: Connection<DbConn>,
     q: String,
+    _user: User,
 ) -> Result<Custom<Json<Vec<DBLogEntry>>>, Custom<Json<serde_json::Value>>> {
     LogEntryRepository::search_by_action(&mut conn, &q)
         .await
@@ -173,6 +174,7 @@ pub async fn list_all_logs(
     mut conn: Connection<DbConn>,
     page: Option<u32>,
     limit: Option<u32>,
+    _user: User,
 ) -> Result<Json<Vec<DBLogEntry>>, Custom<Json<serde_json::Value>>> {
     let limit = limit.unwrap_or(50);
     let offset = page.unwrap_or(0) * limit;
@@ -194,6 +196,7 @@ pub async fn list_all_logs(
 pub async fn exists_log_by_level(
     mut conn: Connection<DbConn>,
     level: &str,
+    _user: User,
 ) -> Result<NoContent, Status> {
     match LogEntryRepository::exists_by_level(&mut conn, level).await {
         Ok(true) => Ok(NoContent),
@@ -206,6 +209,7 @@ pub async fn exists_log_by_level(
 pub async fn exists_log_by_action(
     mut conn: Connection<DbConn>,
     action: &str,
+    _user: User,
 ) -> Result<NoContent, Status> {
     match LogEntryRepository::exists_by_action(&mut conn, action).await {
         Ok(true) => Ok(NoContent),

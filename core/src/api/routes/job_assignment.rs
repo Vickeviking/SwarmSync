@@ -1,21 +1,14 @@
 use crate::api::DbConn;
 use crate::database::models::job::{JobAssignment, NewJobAssignment};
-use crate::database::repositories::{
-    JobAssignmentRepository, JobMetricRepository, JobRepository, JobResultRepository,
-    LogEntryRepository, UserRepository, WorkerRepository, WorkerStatusRepository,
-};
-use crate::shared::enums::job::JobStateEnum;
-use crate::shared::{enums::system::CoreEvent, SharedResources};
+use crate::database::repositories::JobAssignmentRepository;
 
+use crate::database::models::user::User;
 use chrono::NaiveDateTime;
 use rocket::http::Status;
-use rocket::response::status::{Custom, NoContent};
+use rocket::response::status::Custom;
 use rocket::serde::json::{json, Json, Value};
-use rocket::{delete, get, patch, post, put, routes, Build, Rocket, Route, Shutdown};
-use rocket_db_pools::{Connection, Database};
-use std::env;
-use std::sync::Arc;
-use tokio::sync::{broadcast::error::RecvError, mpsc, RwLock};
+use rocket::{delete, get, patch, post, routes, Route};
+use rocket_db_pools::Connection;
 
 pub fn routes() -> Vec<Route> {
     routes![
@@ -58,6 +51,7 @@ pub fn routes() -> Vec<Route> {
 async fn create_assignment(
     mut db: Connection<DbConn>,
     new_assignment: Json<NewJobAssignment>,
+    _user: User,
 ) -> Result<Custom<Json<JobAssignment>>, Custom<Json<serde_json::Value>>> {
     JobAssignmentRepository::create(&mut db, new_assignment.into_inner())
         .await
@@ -74,6 +68,7 @@ async fn create_assignment(
 async fn get_assignment_by_id(
     mut db: Connection<DbConn>,
     id: i32,
+    _user: User,
 ) -> Result<Json<JobAssignment>, Custom<Json<serde_json::Value>>> {
     JobAssignmentRepository::find_by_id(&mut db, id)
         .await
@@ -85,6 +80,7 @@ async fn get_assignment_by_id(
 async fn delete_assignment(
     mut db: Connection<DbConn>,
     id: i32,
+    _user: User,
 ) -> Result<Status, Custom<Json<serde_json::Value>>> {
     JobAssignmentRepository::delete(&mut db, id)
         .await
@@ -103,6 +99,7 @@ async fn delete_assignment(
 async fn get_assignments_by_job_id(
     mut db: Connection<DbConn>,
     job_id: i32,
+    _user: User,
 ) -> Result<Json<Vec<JobAssignment>>, Custom<serde_json::Value>> {
     JobAssignmentRepository::find_by_job_id(&mut db, job_id)
         .await
@@ -119,6 +116,7 @@ async fn get_assignments_by_job_id(
 async fn get_assignments_by_worker_id(
     mut db: Connection<DbConn>,
     worker_id: i32,
+    _user: User,
 ) -> Result<Json<Vec<JobAssignment>>, Custom<serde_json::Value>> {
     JobAssignmentRepository::find_by_worker_id(&mut db, worker_id)
         .await
@@ -136,6 +134,7 @@ async fn lookup_assignment(
     mut db: Connection<DbConn>,
     job_id: i32,
     worker_id: i32,
+    _user: User,
 ) -> Result<Json<Option<JobAssignment>>, Custom<serde_json::Value>> {
     JobAssignmentRepository::find_assignment_by_job_and_worker(&mut db, job_id, worker_id)
         .await
@@ -154,6 +153,7 @@ async fn get_assignments_for_worker_in_range(
     worker_id: i32,
     start: &str,
     end: &str,
+    _user: User,
 ) -> Result<Json<Vec<JobAssignment>>, Custom<Json<Value>>> {
     let start = NaiveDateTime::parse_from_str(start, "%Y-%m-%d %H:%M:%S")
         .map_err(|_| Custom(Status::BadRequest, Json(json!({"error":"invalid start"}))))?;
@@ -176,6 +176,7 @@ async fn get_assignments_for_worker_in_range(
 #[get("/assignments/active")]
 async fn get_active_assignments(
     mut db: Connection<DbConn>,
+    _user: User,
 ) -> Result<Json<Vec<JobAssignment>>, Custom<serde_json::Value>> {
     JobAssignmentRepository::list_active_assignments(&mut db)
         .await
@@ -195,6 +196,7 @@ async fn update_started_at(
     mut db: Connection<DbConn>,
     id: i32,
     started_at: Json<NaiveDateTime>,
+    _user: User,
 ) -> Result<Json<JobAssignment>, Custom<serde_json::Value>> {
     JobAssignmentRepository::update_started_at(&mut db, id, started_at.into_inner())
         .await
@@ -212,6 +214,7 @@ async fn update_finished_at(
     mut db: Connection<DbConn>,
     id: i32,
     finished_at: Json<NaiveDateTime>,
+    _user: User,
 ) -> Result<Json<JobAssignment>, Custom<serde_json::Value>> {
     JobAssignmentRepository::update_finished_at(&mut db, id, finished_at.into_inner())
         .await

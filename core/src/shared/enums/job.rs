@@ -1,18 +1,16 @@
 use std::io::Write;
 use std::str::FromStr;
 
-use crate::database::schema::*;
-use chrono::NaiveDateTime;
 use diesel::deserialize::FromSql;
 use diesel::expression::AsExpression;
 use diesel::pg::{Pg, PgValue};
 use diesel::serialize::ToSql;
 use diesel::sql_types::Text;
-use diesel::{deserialize::FromSqlRow, prelude::*};
+use diesel::deserialize::FromSqlRow;
 use serde::{Deserialize, Serialize};
 
-#[derive(AsExpression, Debug, Deserialize, Serialize, FromSqlRow)]
-#[diesel(sql_type = diesel::sql_types::VarChar)]
+#[derive(AsExpression, Debug, Deserialize, Serialize, FromSqlRow, PartialEq)]
+#[diesel(sql_type = Text)]
 pub enum JobStateEnum {
     Queued,
     Running,
@@ -73,7 +71,7 @@ impl ToSql<Text, Pg> for JobStateEnum {
 }
 
 #[derive(AsExpression, Debug, Deserialize, Serialize, FromSqlRow)]
-#[diesel(sql_type = diesel::sql_types::VarChar)]
+#[diesel(sql_type = Text)]
 pub enum JobScheduleEnum {
     Once,
     Cron,

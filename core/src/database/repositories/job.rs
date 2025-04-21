@@ -41,11 +41,11 @@ use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
 use crate::database::models::job::{
-    Job, JobAssignment, JobMetric, JobResult, NewJob, NewJobAssignment, NewJobMetric, NewJobResult,
+    Job, NewJob,
 };
 
 use crate::shared::enums::{
-    job::{JobScheduleEnum, JobStateEnum},
+    job::JobStateEnum,
     schedule::ScheduleTypeEnum,
 };
 
@@ -62,6 +62,7 @@ impl JobRepository {
     }
 
     pub async fn create(c: &mut AsyncPgConnection, new_job: NewJob) -> QueryResult<Job> {
+        dbg!(&new_job.state);
         diesel::insert_into(jobs::table)
             .values(new_job)
             .get_result(c)

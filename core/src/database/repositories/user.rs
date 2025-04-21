@@ -28,10 +28,7 @@
 */
 
 use crate::database::models::user::{NewUser, User};
-use crate::database::models::*;
 use crate::database::schema::*;
-use diesel::dsl::now;
-use diesel::dsl::IntervalDsl;
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
