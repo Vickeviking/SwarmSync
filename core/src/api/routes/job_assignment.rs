@@ -195,34 +195,62 @@ async fn get_active_assignments(
 async fn update_started_at(
     mut db: Connection<DbConn>,
     id: i32,
-    started_at: Json<NaiveDateTime>,
+    started_at: Json<Value>,
     _user: User,
 ) -> Result<Json<JobAssignment>, Custom<serde_json::Value>> {
-    JobAssignmentRepository::update_started_at(&mut db, id, started_at.into_inner())
-        .await
-        .map(Json)
-        .map_err(|e| {
+    if let Some(started_at_str) = started_at.get("started_at").and_then(Value::as_str) {
+        let started_at = NaiveDateTime::parse_from_str(started_at_str, "%+").map_err(|e| {
             Custom(
-                Status::InternalServerError,
-                json!({ "error": e.to_string() }),
+                Status::BadRequest,
+                json!({ "error": format!("Invalid date-time format: {}", e) }),
             )
-        })
+        })?;
+
+        JobAssignmentRepository::update_started_at(&mut db, id, started_at)
+            .await
+            .map(Json)
+            .map_err(|e| {
+                Custom(
+                    Status::InternalServerError,
+                    json!({ "error": e.to_string() }),
+                )
+            })
+    } else {
+        Err(Custom(
+            Status::BadRequest,
+            json!({ "error": "Missing or invalid 'started_at' field" }),
+        ))
+    }
 }
 
 #[patch("/assignments/<id>/finished", format = "json", data = "<finished_at>")]
 async fn update_finished_at(
     mut db: Connection<DbConn>,
     id: i32,
-    finished_at: Json<NaiveDateTime>,
+    finished_at: Json<Value>,
     _user: User,
 ) -> Result<Json<JobAssignment>, Custom<serde_json::Value>> {
-    JobAssignmentRepository::update_finished_at(&mut db, id, finished_at.into_inner())
-        .await
-        .map(Json)
-        .map_err(|e| {
+    if let Some(finished_at_str) = finished_at.get("finished_at").and_then(Value::as_str) {
+        let finished_at = NaiveDateTime::parse_from_str(finished_at_str, "%+").map_err(|e| {
             Custom(
-                Status::InternalServerError,
-                json!({ "error": e.to_string() }),
+                Status::BadRequest,
+                json!({ "error": format!("Invalid date-time format: {}", e) }),
             )
-        })
+        })?;
+
+        JobAssignmentRepository::update_finished_at(&mut db, id, finished_at)
+            .await
+            .map(Json)
+            .map_err(|e| {
+                Custom(
+                    Status::InternalServerError,
+                    json!({ "error": e.to_string() }),
+                )
+            })
+    } else {
+        Err(Custom(
+            Status::BadRequest,
+            json!({ "error": "Missing or invalid 'finished_at' field" }),
+        ))
+    }
 }

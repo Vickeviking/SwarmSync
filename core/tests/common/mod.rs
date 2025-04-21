@@ -1,4 +1,4 @@
-use chrono::Utc;
+use chrono::{NaiveDateTime, Utc};
 use diesel_async::AsyncPgConnection;
 use reqwest::{header, Client, ClientBuilder, StatusCode};
 use serde_json::json;
@@ -7,8 +7,13 @@ use swarmsync_core::database::models::job::{Job, JobAssignment};
 use swarmsync_core::database::models::user::{User, UserResponse};
 use swarmsync_core::database::models::worker::Worker;
 use swarmsync_core::database::repositories::user::UserRepository;
-use swarmsync_core::database::repositories::JobRepository;
+use swarmsync_core::database::repositories::{JobAssignmentRepository, JobRepository};
 use uuid::Uuid;
+
+// ===== UTILITIES =====
+pub fn get_ndt_now() -> NaiveDateTime {
+    Utc::now().naive_utc()
+}
 
 // ========== Constants ==========
 pub const APP_HOST: &str = "http://localhost:8000";
@@ -247,6 +252,81 @@ pub async fn mark_job_failed(client: &Client, job_id: i32) {
         .send()
         .await
         .expect("Failed to mark job complete");
+}
+
+// Job assignment
+/// Mark a job assignment as started via API
+pub async fn mark_assignment_started_via_api(
+    client: &Client,
+    assignment_id: i32,
+    started_at: NaiveDateTime,
+) {
+    // Fetch the assignment details
+    let mut conn: AsyncPgConnection = commands::load_db_connection().await;
+    let assignment: JobAssignment = JobAssignmentRepository::find_by_id(&mut conn, assignment_id)
+        .await
+        .expect("Could not find assignment by id");
+
+    // Construct the payload to update the assignment
+    let updated_payload = json!({
+        "id": assignment.id,
+        "job_id": assignment.job_id,
+        "worker_id": assignment.worker_id,
+        "assigned_at": assignment.assigned_at,
+        "started_at": Some(started_at),  // Adding the started_at value
+        "finished_at": assignment.finished_at,
+    });
+
+    // Send the PATCH request
+    let resp = client
+        .patch(&format!(
+            "{}/assignments/{}/started",
+            APP_HOST, assignment_id
+        ))
+        .json(&updated_payload)
+        .send()
+        .await
+        .expect("Failed to mark assignment started");
+
+    // Assert that the request was successful
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+/// Mark a job assignment as finished via API
+pub async fn mark_assignment_finished_via_api(
+    client: &Client,
+    assignment_id: i32,
+    finished_at: NaiveDateTime,
+) {
+    // Fetch the assignment details
+    let mut conn: AsyncPgConnection = commands::load_db_connection().await;
+    let assignment: JobAssignment = JobAssignmentRepository::find_by_id(&mut conn, assignment_id)
+        .await
+        .expect("Could not find assignment by id");
+
+    // Construct the payload to update the assignment
+    let updated_payload = json!({
+        "id": assignment.id,
+        "job_id": assignment.job_id,
+        "worker_id": assignment.worker_id,
+        "assigned_at": assignment.assigned_at,
+        "started_at": assignment.started_at,
+        "finished_at": Some(finished_at), // Adding the finished_at value
+    });
+
+    // Send the PATCH request
+    let resp = client
+        .patch(&format!(
+            "{}/assignments/{}/finished",
+            APP_HOST, assignment_id
+        ))
+        .json(&updated_payload)
+        .send()
+        .await
+        .expect("Failed to mark assignment finished");
+
+    // Assert that the request was successful
+    assert_eq!(resp.status(), StatusCode::OK);
 }
 
 // ======== Worker Utilities ==========

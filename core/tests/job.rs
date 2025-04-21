@@ -39,17 +39,13 @@
 pub mod common;
 
 use rocket::serde::json::json;
-use swarmsync_core::database::models::job::NewJob;
-use swarmsync_core::shared::enums::image_format::ImageFormatEnum;
-use swarmsync_core::shared::enums::job::{JobScheduleEnum, JobStateEnum};
-use swarmsync_core::shared::enums::output::OutputTypeEnum;
-use swarmsync_core::shared::enums::schedule::ScheduleTypeEnum;
+use swarmsync_core::shared::enums::job::JobStateEnum;
 
 #[cfg(test)]
 mod job_api_tests {
     use chrono::Utc;
     use reqwest::StatusCode;
-    use swarmsync_core::database::{models::job::Job, schema::jobs::user_id};
+    use swarmsync_core::database::models::job::Job;
 
     use crate::common::APP_HOST;
 
