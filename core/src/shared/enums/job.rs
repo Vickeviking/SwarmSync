@@ -2,11 +2,11 @@ use std::io::Write;
 use std::str::FromStr;
 
 use diesel::deserialize::FromSql;
+use diesel::deserialize::FromSqlRow;
 use diesel::expression::AsExpression;
 use diesel::pg::{Pg, PgValue};
 use diesel::serialize::ToSql;
 use diesel::sql_types::Text;
-use diesel::deserialize::FromSqlRow;
 use serde::{Deserialize, Serialize};
 
 #[derive(AsExpression, Debug, Deserialize, Serialize, FromSqlRow, PartialEq)]
@@ -70,7 +70,7 @@ impl ToSql<Text, Pg> for JobStateEnum {
     }
 }
 
-#[derive(AsExpression, Debug, Deserialize, Serialize, FromSqlRow)]
+#[derive(AsExpression, Debug, Deserialize, Serialize, FromSqlRow, PartialEq, Eq)]
 #[diesel(sql_type = Text)]
 pub enum JobScheduleEnum {
     Once,

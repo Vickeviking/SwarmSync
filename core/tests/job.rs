@@ -41,206 +41,653 @@ pub mod common;
 use rocket::serde::json::json;
 use swarmsync_core::database::models::job::NewJob;
 use swarmsync_core::shared::enums::image_format::ImageFormatEnum;
-use swarmsync_core::shared::enums::job::JobStateEnum;
+use swarmsync_core::shared::enums::job::{JobScheduleEnum, JobStateEnum};
 use swarmsync_core::shared::enums::output::OutputTypeEnum;
 use swarmsync_core::shared::enums::schedule::ScheduleTypeEnum;
 
 #[cfg(test)]
 mod job_api_tests {
+    use chrono::Utc;
     use reqwest::StatusCode;
-    use swarmsync_core::database::models::job::Job;
+    use swarmsync_core::database::{models::job::Job, schema::jobs::user_id};
+
+    use crate::common::APP_HOST;
 
     use super::*;
 
     #[tokio::test]
     async fn test_create_job() {
-        // Step 1: Build the authorized client with a logged-in admin user
+        // Build the authorized client with a logged-in admin user
         let (client, user) = common::build_client_with_logged_in_admin().await;
 
-        // Step 2: Prepare the job payload
-        let new_job = NewJob {
-            user_id: user.id,
-            job_name: common::generate_unique_job_name(),
-            image_url: String::from("docker.io/library/alpine:latest"),
-            image_format: ImageFormatEnum::DockerRegistry,
-            docker_flags: None,
-            output_type: OutputTypeEnum::Stdout,
-            output_paths: None,
-            schedule_type: ScheduleTypeEnum::Once,
-            cron_expression: None,
-            notes: None,
-            state: JobStateEnum::Queued,
-        };
-
-        // Step 3: Check debug output for the state field
-        dbg!(&new_job.state);
-
-        // Step 4: Prepare and log the outgoing JSON
+        // Build JSON payload directly
         let payload_json = json!({
-            "user_id": new_job.user_id,
-            "job_name": new_job.job_name,
-            "image_url": new_job.image_url,
-            "image_format": new_job.image_format.to_string(),
-            "docker_flags": new_job.docker_flags,
-            "output_type": new_job.output_type.to_string(),
-            "output_paths": new_job.output_paths,
-            "schedule_type": new_job.schedule_type.to_string(),
-            "cron_expression": new_job.cron_expression,
-            "notes": new_job.notes,
-            "state": new_job.state.to_string(),
+            "user_id": user.id,
+            "job_name": common::generate_unique_job_name(),
+            "image_url": "docker.io/library/alpine:latest",
+            "image_format": "DockerRegistry",
+            "docker_flags": null,
+            "output_type": "Stdout",
+            "output_paths": null,
+            "schedule_type": "Once",
+            "cron_expression": null,
+            "notes": null,
+            "state": "Queued"
         });
 
-        println!(
-            "📦 Serialized JSON payload:\n{}",
-            serde_json::to_string_pretty(&payload_json).unwrap()
-        );
-
-        // Step 5: Ensure the JSON is actually deserializable by NewJob
-        match serde_json::from_value::<NewJob>(payload_json.clone()) {
-            Ok(validated) => println!(
-                "✅ JSON successfully deserializes to NewJob:\n{:#?}",
-                validated
-            ),
-            Err(e) => panic!(
-                "❌ JSON failed to deserialize into NewJob:\n{}\nPayload: {}",
-                e, payload_json
-            ),
-        }
-
-        // Step 6: Send the request
+        // Send the request
         let response = client
             .post(format!("{}/jobs", common::APP_HOST))
             .json(&payload_json)
             .send()
             .await
-            .expect("❌ Failed to send create job request");
+            .expect("Failed to send create job request");
 
-        // Step 7: Check status
         assert_eq!(response.status(), StatusCode::CREATED);
-
-        // Step 8: Parse the returned job
-        let body = response
-            .text()
-            .await
-            .expect("❌ Failed to read response body");
+        let body = response.text().await.expect("Failed to read response body");
 
         let created_job: Job = serde_json::from_str(&body).unwrap_or_else(|e| {
             panic!(
-                "❌ Failed to parse Job from response JSON:\nError: {}\nBody:\n{}",
+                "Failed to parse Job from response JSON:\nError: {}\nBody:\n{}",
                 e, body
             )
         });
 
-        // Step 9: Assert the job content
-        assert_eq!(created_job.user_id, new_job.user_id);
-        assert_eq!(created_job.job_name, new_job.job_name);
-        assert_eq!(created_job.image_url, new_job.image_url);
-        assert_eq!(created_job.image_format, new_job.image_format);
-        assert_eq!(created_job.state, JobStateEnum::Queued);
+        // Extract values from original JSON to assert against
+        let expected_job_name = payload_json["job_name"].as_str().unwrap();
+        let expected_image_url = payload_json["image_url"].as_str().unwrap();
+
+        assert_eq!(created_job.user_id, user.id);
+        assert_eq!(created_job.job_name, expected_job_name);
+        assert_eq!(created_job.image_url, expected_image_url);
+        assert_eq!(created_job.image_format.to_string(), "DockerRegistry");
+        assert_eq!(created_job.state.to_string(), "Queued");
+
+        common::delete_jobs_via_api(&client, &vec![created_job.id]).await;
+        common::delete_user_via_api(&client, user.id).await;
     }
 
-    #[test]
-    fn test_get_job_by_id() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_get_job_by_id() {
+        let (client, user, jobs, job_ids) = common::build_client_and_user_with_n_jobs(3).await;
+        let job_id = job_ids[1];
+
+        let response = client
+            .get(format!("{}/jobs/{job_id}", common::APP_HOST))
+            .send()
+            .await
+            .expect("Failed to send GET /jobs/:id");
+
+        assert_eq!(response.status(), 200);
+
+        let job: Job = response.json().await.expect("Invalid JobPayload response");
+        assert_eq!(job.id, job_id);
+        assert_eq!(job.job_name, jobs[1].job_name);
+
+        common::delete_jobs_via_api(&client, &job_ids).await;
+        common::delete_user_via_api(&client, user.id).await;
     }
 
-    #[test]
-    fn test_update_job() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_update_job() {
+        let (client, user, jobs, job_ids) = common::build_client_and_user_with_n_jobs(1).await;
+        let job_id = job_ids[0];
+
+        let new_job_name = common::generate_unique_job_name();
+        let job_notes = "Hello this job is cpu bound";
+
+        let updated_payload = serde_json::json!({
+            "id": job_id,
+            "user_id": user.id,
+            "job_name": new_job_name,
+            "image_url": "docker.io/library/alpine:latest",
+            "image_format": "DockerRegistry",
+            "docker_flags": null,
+            "output_type": "Stdout",
+            "output_paths": null,
+            "schedule_type": "Once",
+            "cron_expression": null,
+            "notes": job_notes,
+            "state": "Running",
+            "created_at": jobs[0].created_at,
+            "updated_at": Utc::now().naive_utc(),
+        });
+
+        let response = client
+            .patch(format!("{}/jobs/{job_id}", common::APP_HOST))
+            .json(&updated_payload)
+            .send()
+            .await
+            .expect("Failed to send PATCH /jobs/:id");
+
+        assert_eq!(response.status(), 200);
+
+        let updated_job: Job = response.json().await.expect("Invalid updated JobPayload");
+        assert_eq!(updated_job.state, JobStateEnum::Running);
+        assert_eq!(updated_job.job_name, new_job_name);
+        assert_eq!(updated_job.notes.unwrap(), job_notes);
+
+        common::delete_jobs_via_api(&client, &job_ids).await;
+        common::delete_user_via_api(&client, user.id).await;
     }
 
-    #[test]
-    fn test_delete_job() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_delete_job() {
+        let (client, user, _jobs, job_ids) = common::build_client_and_user_with_n_jobs(1).await;
+        let job_id = job_ids[0];
+
+        let delete_response = client
+            .delete(format!("{}/jobs/{job_id}", common::APP_HOST))
+            .send()
+            .await
+            .expect("Failed to send DELETE /jobs/:id");
+
+        assert_eq!(delete_response.status(), 204);
+
+        let get_response = client
+            .get(format!("{}/jobs/{job_id}", common::APP_HOST))
+            .send()
+            .await
+            .expect("Failed to send GET /jobs/:id after delete");
+
+        assert_eq!(get_response.status(), 404);
+
+        common::delete_jobs_via_api(&client, &job_ids).await;
+        common::delete_user_via_api(&client, user.id).await;
     }
 
     // 🔍 Lookup & Search Endpoints
 
-    #[test]
-    fn test_search_jobs() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_search_jobs() {
+        let (client, user, jobs, job_ids) = common::build_client_and_user_with_n_jobs(5).await;
+        let keyword = &jobs[2].job_name[0..3]; // partial match
+
+        let response = client
+            .get(format!(
+                "{}/jobs/search?user_id={}&query={}",
+                APP_HOST, user.id, keyword
+            ))
+            .send()
+            .await
+            .expect("Failed to send search request");
+
+        assert_eq!(response.status(), 200);
+        let matches: Vec<Job> = response.json().await.expect("Invalid search result");
+        assert!(matches.iter().any(|job| job.job_name == jobs[2].job_name));
+
+        common::delete_jobs_via_api(&client, &job_ids).await;
+        common::delete_user_via_api(&client, user.id).await;
     }
 
-    #[test]
-    fn test_get_job_by_name() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_get_job_by_name() {
+        let (client, user, jobs, job_ids) = common::build_client_and_user_with_n_jobs(3).await;
+        let exact_name = &jobs[0].job_name;
+
+        let response = client
+            .get(format!(
+                "{}/jobs/name/{}?name={}",
+                APP_HOST, user.id, exact_name
+            ))
+            .send()
+            .await
+            .expect("Failed to send exact name request");
+
+        assert_eq!(response.status(), 200);
+        let matches: Vec<Job> = response.json().await.expect("Invalid name lookup");
+        assert!(matches.iter().any(|job| job.job_name == *exact_name));
+
+        common::delete_jobs_via_api(&client, &job_ids).await;
+        common::delete_user_via_api(&client, user.id).await;
     }
 
-    #[test]
-    fn test_get_jobs_by_admin() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_get_jobs_by_admin() {
+        let (client, user, _jobs, job_ids) = common::build_client_and_user_with_n_jobs(4).await;
+
+        let response = client
+            .get(format!(
+                "{}/jobs/by_admin?user_id={}&limit=10&offset=0",
+                APP_HOST, user.id
+            ))
+            .send()
+            .await
+            .expect("Failed to send by_admin request");
+
+        assert_eq!(response.status(), 200);
+        let found: Vec<Job> = response.json().await.expect("Invalid by_admin response");
+        assert!(found.len() >= 4);
+
+        common::delete_jobs_via_api(&client, &job_ids).await;
+        common::delete_user_via_api(&client, user.id).await;
     }
 
-    #[test]
-    fn test_get_jobs_by_state() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_get_jobs_by_state() {
+        let (client, user, jobs, job_ids) = common::build_client_and_user_with_n_jobs(2).await;
+        let job_id = job_ids[0];
+
+        // Manually mark one job as Failed
+        let updated_payload = serde_json::json!({
+            "id": job_id,
+            "user_id": user.id,
+            "job_name": jobs[0].job_name,
+            "image_url": "docker.io/library/alpine:latest",
+            "image_format": "DockerRegistry",
+            "docker_flags": null,
+            "output_type": "Stdout",
+            "output_paths": null,
+            "schedule_type": "Once",
+            "cron_expression": null,
+            "notes": null,
+            "state": "Failed",
+            "created_at": jobs[0].created_at,
+            "updated_at": Utc::now().naive_utc(),
+        });
+
+        let response = client
+            .patch(format!("{}/jobs/{job_id}", common::APP_HOST))
+            .json(&updated_payload)
+            .send()
+            .await
+            .expect("Failed to send PATCH /jobs/:id");
+        assert_eq!(response.status(), 200);
+
+        let response = client
+            .get(format!("{}/jobs/state/Failed", APP_HOST))
+            .send()
+            .await
+            .expect("Failed to fetch by state");
+
+        assert_eq!(response.status(), 200);
+        let found: Vec<Job> = response.json().await.expect("Invalid response by state");
+        assert!(found
+            .iter()
+            .any(|job| job.id == job_id && job.state == JobStateEnum::Failed));
+
+        common::delete_jobs_via_api(&client, &job_ids).await;
+        common::delete_user_via_api(&client, user.id).await;
     }
 
-    #[test]
-    fn test_get_recent_jobs() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_get_recent_jobs() {
+        let (client, user, _jobs, job_ids) = common::build_client_and_user_with_n_jobs(3).await;
+
+        let response = client
+            .get(format!("{}/jobs/recent?limit=5", APP_HOST))
+            .send()
+            .await
+            .expect("Failed to get recent jobs");
+
+        assert_eq!(response.status(), 200);
+        let recent: Vec<Job> = response.json().await.expect("Invalid recent jobs response");
+        assert!(!recent.is_empty());
+
+        common::delete_jobs_via_api(&client, &job_ids).await;
+        common::delete_user_via_api(&client, user.id).await;
     }
 
-    #[test]
-    fn test_get_failed_jobs() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_get_failed_jobs() {
+        let (client, user, jobs, job_ids) = common::build_client_and_user_with_n_jobs(2).await;
+        let job_id = job_ids[1];
+
+        // Manually mark one job as Failed
+        let updated_payload = serde_json::json!({
+            "id": job_id,
+            "user_id": user.id,
+            "job_name": jobs[0].job_name,
+            "image_url": "docker.io/library/alpine:latest",
+            "image_format": "DockerRegistry",
+            "docker_flags": null,
+            "output_type": "Stdout",
+            "output_paths": null,
+            "schedule_type": "Once",
+            "cron_expression": null,
+            "notes": null,
+            "state": "Failed",
+            "created_at": jobs[0].created_at,
+            "updated_at": Utc::now().naive_utc(),
+        });
+
+        let response = client
+            .patch(format!("{}/jobs/{job_id}", common::APP_HOST))
+            .json(&updated_payload)
+            .send()
+            .await
+            .expect("Failed to send PATCH /jobs/:id");
+        assert_eq!(response.status(), 200);
+
+        let response = client
+            .get(format!("{}/jobs/failed?limit=10", APP_HOST))
+            .send()
+            .await
+            .expect("Failed to get failed jobs");
+
+        assert_eq!(response.status(), 200);
+        let failed_jobs: Vec<Job> = response.json().await.expect("Invalid failed jobs response");
+        assert!(!failed_jobs.is_empty());
+        assert!(failed_jobs
+            .iter()
+            .any(|job| job.id == job_id && job.state == JobStateEnum::Failed));
+
+        common::delete_jobs_via_api(&client, &job_ids).await;
+        common::delete_user_via_api(&client, user.id).await;
     }
 
     // 🔄 State Transitions
 
-    #[test]
-    fn test_mark_job_running() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_mark_job_running() {
+        let (client, user, jobs, job_ids) = common::build_client_and_user_with_n_jobs(1).await;
+        let job_id = job_ids[0];
+        let job = &jobs[0];
+
+        let updated_payload = serde_json::json!({
+            "id": job_id,
+            "user_id": user.id,
+            "job_name": job.job_name,
+            "image_url": job.image_url,
+            "image_format": job.image_format,
+            "docker_flags": job.docker_flags,
+            "output_type": job.output_type,
+            "output_paths": job.output_paths,
+            "schedule_type": job.schedule_type,
+            "cron_expression": job.cron_expression,
+            "notes": job.notes,
+            "state": "Running",
+            "created_at": job.created_at,
+            "updated_at": Utc::now().naive_utc(),
+        });
+
+        let response = client
+            .patch(format!("{}/jobs/{job_id}/running", APP_HOST))
+            .json(&updated_payload)
+            .send()
+            .await
+            .expect("Failed to mark job running");
+
+        assert_eq!(response.status(), 200);
+        let job: Job = response.json().await.expect("Invalid response");
+        assert_eq!(job.state, JobStateEnum::Running);
+
+        common::delete_jobs_via_api(&client, &job_ids).await;
+        common::delete_user_via_api(&client, user.id).await;
     }
 
-    #[test]
-    fn test_mark_job_succeeded() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_mark_job_succeeded() {
+        let (client, user, jobs, job_ids) = common::build_client_and_user_with_n_jobs(1).await;
+        let job_id = job_ids[0];
+        let job = &jobs[0];
+
+        let updated_payload = serde_json::json!({
+            "id": job_id,
+            "user_id": user.id,
+            "job_name": job.job_name,
+            "image_url": job.image_url,
+            "image_format": job.image_format,
+            "docker_flags": job.docker_flags,
+            "output_type": job.output_type,
+            "output_paths": job.output_paths,
+            "schedule_type": job.schedule_type,
+            "cron_expression": job.cron_expression,
+            "notes": job.notes,
+            "state": "Completed",
+            "created_at": job.created_at,
+            "updated_at": Utc::now().naive_utc(),
+        });
+
+        let response = client
+            .patch(format!("{}/jobs/{job_id}", APP_HOST))
+            .json(&updated_payload)
+            .send()
+            .await
+            .expect("Failed to mark job complete");
+
+        assert_eq!(response.status(), 200);
+        let job: Job = response.json().await.expect("Invalid response");
+        assert_eq!(job.state, JobStateEnum::Completed);
+
+        common::delete_jobs_via_api(&client, &job_ids).await;
+        common::delete_user_via_api(&client, user.id).await;
     }
 
-    #[test]
-    fn test_mark_job_failed() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_mark_job_failed() {
+        let (client, user, jobs, job_ids) = common::build_client_and_user_with_n_jobs(1).await;
+        let job_id = job_ids[0];
+        let job = &jobs[0];
+
+        let updated_payload = serde_json::json!({
+            "id": job_id,
+            "user_id": user.id,
+            "job_name": job.job_name,
+            "image_url": job.image_url,
+            "image_format": job.image_format,
+            "docker_flags": job.docker_flags,
+            "output_type": job.output_type,
+            "output_paths": job.output_paths,
+            "schedule_type": job.schedule_type,
+            "cron_expression": job.cron_expression,
+            "notes": "Example failure reason",
+            "state": "Failed",
+            "created_at": job.created_at,
+            "updated_at": Utc::now().naive_utc(),
+        });
+
+        let response = client
+            .patch(format!("{}/jobs/{job_id}/failed", APP_HOST))
+            .json(&updated_payload)
+            .send()
+            .await
+            .expect("Failed to mark job failed");
+
+        assert_eq!(response.status(), 200);
+        let job: Job = response.json().await.expect("Invalid response");
+        assert_eq!(job.state, JobStateEnum::Failed);
+
+        common::delete_jobs_via_api(&client, &job_ids).await;
+        common::delete_user_via_api(&client, user.id).await;
     }
 
     // ⏱️ Scheduling & Readiness
 
-    #[test]
-    fn test_get_scheduled_jobs() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_get_scheduled_jobs() {
+        let (client, user, jobs, job_ids) = common::build_client_and_user_with_n_jobs(2).await;
+
+        let response = client
+            .get(format!("{}/jobs/scheduled", APP_HOST))
+            .send()
+            .await
+            .expect("Failed to get scheduled jobs");
+
+        assert_eq!(response.status(), 200);
+        let scheduled: Vec<Job> = response
+            .json()
+            .await
+            .expect("Invalid scheduled jobs response");
+        assert!(!scheduled.is_empty());
+        assert!(scheduled.len() >= 2);
+
+        common::delete_jobs_via_api(&client, &job_ids).await;
+        common::delete_user_via_api(&client, user.id).await;
     }
 
-    #[test]
-    fn test_get_cron_jobs_due() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_get_cron_jobs_due() {
+        // not yet fully understood or implemented,
+        // TODO:
     }
 
-    #[test]
-    fn test_get_ready_jobs() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_get_ready_one_time_jobs() {
+        let (client, user, jobs, job_ids) = common::build_client_and_user_with_n_jobs(2).await;
+
+        //mark both jobs ready
+        let job_id = job_ids[0];
+        let job = &jobs[0];
+        let updated_payload = serde_json::json!({
+            "id": job_id,
+            "user_id": user.id,
+            "job_name": job.job_name,
+            "image_url": job.image_url,
+            "image_format": job.image_format,
+            "docker_flags": job.docker_flags,
+            "output_type": job.output_type,
+            "output_paths": job.output_paths,
+            "schedule_type": "Once",
+            "cron_expression": job.cron_expression,
+            "notes": "Example failure reason",
+            "state": "Queued",
+            "created_at": job.created_at,
+            "updated_at": Utc::now().naive_utc(),
+        });
+
+        let response = client
+            .patch(format!("{}/jobs/{job_id}", APP_HOST))
+            .json(&updated_payload)
+            .send()
+            .await
+            .expect("Failed to mark job failed");
+
+        // Second job
+        let job_id = job_ids[1];
+        let job = &jobs[1];
+        let updated_payload = serde_json::json!({
+            "id": job_id,
+            "user_id": user.id,
+            "job_name": job.job_name,
+            "image_url": job.image_url,
+            "image_format": job.image_format,
+            "docker_flags": job.docker_flags,
+            "output_type": job.output_type,
+            "output_paths": job.output_paths,
+            "schedule_type": "Once",
+            "cron_expression": job.cron_expression,
+            "notes": "Example failure reason",
+            "state": "Queued",
+            "created_at": job.created_at,
+            "updated_at": Utc::now().naive_utc(),
+        });
+
+        let response = client
+            .patch(format!("{}/jobs/{job_id}", APP_HOST))
+            .json(&updated_payload)
+            .send()
+            .await
+            .expect("Failed to mark job failed");
+
+        let response = client
+            .get(format!("{}/jobs/one-time-ready", APP_HOST))
+            .send()
+            .await
+            .expect("Failed to get ready jobs");
+
+        assert_eq!(response.status(), 200);
+        let ready_jobs: Vec<Job> = response.json().await.expect("Invalid ready jobs response");
+        assert!(ready_jobs.len() >= 2);
+        assert!(!ready_jobs.is_empty());
+
+        common::delete_jobs_via_api(&client, &job_ids).await;
+        common::delete_user_via_api(&client, user.id).await;
     }
 
     // 📊 Aggregation & Stats
 
-    #[test]
-    fn test_get_job_stats_by_admin() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_get_job_stats_by_admin() {
+        let (client, user, jobs, job_ids) = common::build_client_and_user_with_n_jobs(3).await;
+
+        let response = client
+            .get(format!("{}/jobs/stats/admins", common::APP_HOST))
+            .send()
+            .await
+            .expect("Failed to GET job stats");
+
+        assert_eq!(response.status(), 200);
+        let stats: Vec<(i32, i64)> = response.json().await.expect("Invalid stats format");
+
+        // Ensure our admin's ID is present and job count matches
+        let entry = stats.iter().find(|(admin_id, _)| *admin_id == user.id);
+        assert!(entry.is_some());
+        assert_eq!(entry.unwrap().1, 3);
+
+        common::delete_jobs_via_api(&client, &job_ids).await;
+        common::delete_user_via_api(&client, user.id).await;
     }
 
     // 🤝 Assignment & Worker Routing
 
-    #[test]
-    fn test_get_active_jobs_for_worker() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_get_active_jobs_for_worker() {
+        let (client, user, jobs, job_ids) = common::build_client_and_user_with_n_jobs(2).await;
+        let worker = common::create_worker_via_api(&client, user.id).await;
+
+        common::assign_job_to_worker(&client, job_ids[0], worker.id).await;
+        common::mark_job_running(&client, job_ids[0]).await;
+
+        let response = client
+            .get(format!("{}/jobs/active/{}", common::APP_HOST, worker.id))
+            .send()
+            .await
+            .expect("Failed to GET active jobs for worker");
+
+        assert_eq!(response.status(), 200);
+        let jobs: Vec<Job> = response.json().await.expect("Invalid jobs response");
+        assert!(jobs
+            .iter()
+            .any(|j| j.id == job_ids[0] && j.state == JobStateEnum::Running));
+
+        common::delete_jobs_via_api(&client, &job_ids).await;
+        common::delete_worker_via_api(&client, worker.id).await;
+        common::delete_user_via_api(&client, user.id).await;
     }
 
-    #[test]
-    fn test_get_assigned_jobs_for_worker() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_get_assigned_jobs_for_worker() {
+        let (client, user, jobs, job_ids) = common::build_client_and_user_with_n_jobs(2).await;
+        let worker = common::create_worker_via_api(&client, user.id).await;
+
+        common::assign_job_to_worker(&client, job_ids[1], worker.id).await;
+
+        let response = client
+            .get(format!("{}/jobs/assigned/{}", common::APP_HOST, worker.id))
+            .send()
+            .await
+            .expect("Failed to GET assigned jobs for worker");
+
+        assert_eq!(response.status(), 200);
+        let jobs: Vec<Job> = response.json().await.expect("Invalid jobs response");
+        assert!(jobs.iter().any(|j| j.id == job_ids[1]));
+
+        common::delete_jobs_via_api(&client, &job_ids).await;
+        common::delete_worker_via_api(&client, worker.id).await;
+        common::delete_user_via_api(&client, user.id).await;
     }
 
-    #[test]
-    fn test_get_unassigned_jobs() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_get_unassigned_jobs() {
+        let (client, user, jobs, job_ids) = common::build_client_and_user_with_n_jobs(2).await;
+        let worker = common::create_worker_via_api(&client, user.id).await;
+
+        // Assign one job, leave the other unassigned
+        common::assign_job_to_worker(&client, job_ids[0], worker.id).await;
+
+        let response = client
+            .get(format!("{}/jobs/unassigned", common::APP_HOST))
+            .send()
+            .await
+            .expect("Failed to GET unassigned jobs");
+
+        assert_eq!(response.status(), 200);
+        let jobs: Vec<Job> = response.json().await.expect("Invalid jobs response");
+        assert!(!jobs.is_empty());
+
+        common::delete_jobs_via_api(&client, &job_ids).await;
+        common::delete_worker_via_api(&client, worker.id).await;
+        common::delete_user_via_api(&client, user.id).await;
     }
 }

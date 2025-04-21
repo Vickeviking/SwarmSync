@@ -17,16 +17,52 @@
 • PATCH /assignments/:id/started   → Mark assignment as started (NaiveDateTime) → 200 OK (JobAssignment)
 • PATCH /assignments/:id/finished  → Mark assignment as finished (NaiveDateTime) → 200 OK (JobAssignment)
 ======================================================================== */
+pub mod common;
 
 #[cfg(test)]
 mod job_assignment_api_tests {
-    
-
+    use crate::common::{
+        assign_job_to_worker, build_client_and_user_with_n_jobs, create_worker_via_api,
+        delete_user_via_api, delete_worker_via_api, APP_HOST,
+    };
+    use chrono::Utc;
+    use reqwest::Client;
+    use serde_json::json;
+    use uuid::Uuid;
     // 🚀 CRUD Endpoints
 
-    #[test]
-    fn test_create_job_assignment() {
-        // Test logic goes here
+    #[tokio::test]
+    async fn test_create_job_assignment() {
+        let (client, user, jobs, job_ids) = build_client_and_user_with_n_jobs(1).await;
+        let job = &jobs[0];
+        let worker = create_worker_via_api(&client, user.id).await;
+
+        let assignment = assign_job_to_worker(&client, job.id, worker.id).await;
+
+        assert_eq!(assignment.job_id, job.id);
+        assert_eq!(assignment.worker_id, worker.id);
+        assert!(assignment.assigned_at <= Utc::now().naive_utc());
+
+        // cleanup: job -> worker -> user
+        client
+            .delete(&format!("{}/jobs/{}", APP_HOST, job.id))
+            .send()
+            .await
+            .expect("Failed to delete job");
+
+        delete_worker_via_api(&client, worker.id).await;
+
+        //make sure that job assignment does not exist
+        let lookup_url = format!("{}/assignments/lookup/{}/{}", APP_HOST, job.id, worker.id);
+        let res = client.get(&lookup_url).send().await.expect("GET failed");
+
+        assert_eq!(
+            res.status().as_u16(),
+            404,
+            "Expected assignment to be gone after worker deletion"
+        );
+
+        delete_user_via_api(&client, user.id).await;
     }
 
     #[test]

@@ -9,11 +9,13 @@ CREATE TABLE job_results (
 
 CREATE TABLE job_assignments (
     id SERIAL PRIMARY KEY,
-    job_id SERIAL REFERENCES jobs(id) ON DELETE CASCADE,
-    worker_id SERIAL REFERENCES workers(id) ON DELETE CASCADE,
+    job_id INTEGER NOT NULL,
+    worker_id INTEGER NOT NULL,
     assigned_at TIMESTAMP NOT NULL DEFAULT now(),
     started_at TIMESTAMP,
-    finished_at TIMESTAMP
+    finished_at TIMESTAMP,
+    FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE,
+    FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE CASCADE
 );
 
 CREATE TABLE job_metrics (

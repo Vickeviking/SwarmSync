@@ -320,7 +320,7 @@ pub async fn list_due_cron_jobs(
         .map_err(|e| Custom(Status::BadRequest, json!({ "error": e.to_string() })))
 }
 
-#[get("/jobs/ready")]
+#[get("/jobs/one-time-ready")]
 pub async fn list_ready_jobs(
     mut db: Connection<DbConn>,
     _user: User,
