@@ -1,0 +1,28 @@
+use crate::cli::views::{graph, jobs, users};
+use dialoguer::{theme::ColorfulTheme, Select};
+
+pub async fn main_menu() -> anyhow::Result<()> {
+    loop {
+        let options = vec![
+            "Quit",
+            "User Management",
+            "User Perspective",
+            "Visualize Graph",
+        ];
+
+        let choice = Select::with_theme(&ColorfulTheme::default())
+            .with_prompt("Main Menu")
+            .default(0)
+            .items(&options)
+            .interact()?;
+
+        match choice {
+            0 => break,
+            1 => users::menu().await?,
+            2 => jobs::user_perspective_menu().await?,
+            3 => graph::visualize().await?,
+            _ => unreachable!(),
+        }
+    }
+    Ok(())
+}

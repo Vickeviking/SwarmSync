@@ -4,6 +4,8 @@
 //
 // ***********************************
 
+use std::fmt;
+
 use crate::database::models::user::User;
 use crate::database::schema::{worker_status, workers};
 use crate::shared::enums::workers::{OSEnum, WorkerStatusEnum};
@@ -28,6 +30,26 @@ pub struct Worker {
     pub tags: Option<Vec<Option<String>>>,
     pub created_at: NaiveDateTime,
     pub last_seen_at: Option<NaiveDateTime>,
+}
+
+impl fmt::Display for Worker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "[{}] {}\nOS: {:?} | Arch: {}\nIP: {} | SSH: {}@{}\nDocker: {}\nLast seen: {}",
+            self.id,
+            self.label,
+            self.os,
+            self.arch,
+            self.ip_address,
+            self.ssh_user,
+            self.hostname,
+            self.docker_version,
+            self.last_seen_at
+                .map(|ts| ts.format("%Y-%m-%d %H:%M").to_string())
+                .unwrap_or_else(|| "Never".into())
+        )
+    }
 }
 
 #[derive(Debug, Insertable, Deserialize)]

@@ -4,6 +4,7 @@ use diesel::pg::{Pg, PgValue};
 use diesel::serialize::ToSql;
 use diesel::sql_types::Text;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::io::Write;
 use std::str::FromStr;
 
@@ -77,17 +78,6 @@ pub enum OSEnum {
     Any,
 }
 
-impl ToString for OSEnum {
-    fn to_string(&self) -> String {
-        match self {
-            OSEnum::Linux => String::from("Linux"),
-            OSEnum::Windows => String::from("Windows"),
-            OSEnum::MacOSEnum => String::from("MacOSEnum"),
-            OSEnum::Any => String::from("Any"),
-        }
-    }
-}
-
 impl FromStr for OSEnum {
     type Err = ();
 
@@ -126,5 +116,17 @@ impl ToSql<Text, Pg> for OSEnum {
             OSEnum::Any => out.write_all(b"Any")?,
         }
         Ok(diesel::serialize::IsNull::No)
+    }
+}
+
+impl fmt::Display for OSEnum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            OSEnum::Linux => "Linux",
+            OSEnum::Windows => "Windows",
+            OSEnum::MacOSEnum => "MacOS",
+            OSEnum::Any => "Any",
+        };
+        write!(f, "{}", s)
     }
 }

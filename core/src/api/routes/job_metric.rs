@@ -17,7 +17,6 @@ pub fn routes() -> Vec<Route> {
         get_metrics_by_job_id,
         get_metrics_by_worker_id,
         get_most_recent_for_job,
-        list_metrics_for_job
     ]
 }
 
@@ -89,7 +88,7 @@ pub async fn get_metrics_by_job_id(
     mut db: Connection<DbConn>,
     job_id: i32,
     _user: User,
-) -> Result<Json<Vec<JobMetric>>, Custom<Value>> {
+) -> Result<Json<JobMetric>, Custom<Value>> {
     JobMetricRepository::find_by_job_id(&mut db, job_id)
         .await
         .map(Json)
@@ -125,23 +124,6 @@ pub async fn get_most_recent_for_job(
     _user: User,
 ) -> Result<Json<Option<JobMetric>>, Custom<Value>> {
     JobMetricRepository::get_most_recent_for_job(&mut db, job_id)
-        .await
-        .map(Json)
-        .map_err(|e| {
-            Custom(
-                Status::InternalServerError,
-                json!({ "error": e.to_string() }),
-            )
-        })
-}
-
-#[get("/metrics/chronological/<job_id>")]
-pub async fn list_metrics_for_job(
-    mut db: Connection<DbConn>,
-    job_id: i32,
-    _user: User,
-) -> Result<Json<Vec<JobMetric>>, Custom<Value>> {
-    JobMetricRepository::list_metrics_for_job(&mut db, job_id)
         .await
         .map(Json)
         .map_err(|e| {

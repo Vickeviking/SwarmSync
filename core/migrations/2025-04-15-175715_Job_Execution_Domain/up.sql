@@ -20,12 +20,14 @@ CREATE TABLE job_assignments (
 
 CREATE TABLE job_metrics (
     id SERIAL PRIMARY KEY,
-    job_id SERIAL UNIQUE REFERENCES jobs(id) ON DELETE CASCADE,
-    worker_id SERIAL REFERENCES workers(id) ON DELETE CASCADE,
-    duration_sec INTEGER,      -- Runtime duration in seconds
-    cpu_usage_pct REAL,        -- Average CPU usage percentage
-    mem_usage_mb REAL,         -- Maximum memory usage in megabytes
-    exit_code INTEGER,         -- Exit code from the job's execution process
-    timestamp TIMESTAMP NOT NULL DEFAULT now()  -- Timestamp when metrics are recorded (e.g., on completion)
+    job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    worker_id INTEGER NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    duration_sec INTEGER,
+    cpu_usage_pct REAL,
+    mem_usage_mb REAL,
+    exit_code INTEGER,
+    timestamp TIMESTAMP NOT NULL DEFAULT now(),
+    CONSTRAINT unique_job_worker_pair UNIQUE (job_id, worker_id)
 );
+
 

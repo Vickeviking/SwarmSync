@@ -4,6 +4,8 @@
 //
 // ***********************************
 
+use std::fmt;
+
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -33,6 +35,26 @@ pub struct Job {
     pub error_message: Option<String>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+}
+
+impl fmt::Display for Job {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "[{}] {}\nImage: {} ({:?})\nSchedule: {:?}{}\nState: {:?} | Created: {}",
+            self.id,
+            self.job_name,
+            self.image_url,
+            self.image_format,
+            self.schedule_type,
+            match &self.cron_expression {
+                Some(expr) => format!(" ({})", expr),
+                None => "".into(),
+            },
+            self.state,
+            self.created_at.format("%Y-%m-%d %H:%M")
+        )
+    }
 }
 
 #[derive(Debug, Insertable, Deserialize, Serialize)]

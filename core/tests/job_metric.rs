@@ -9,7 +9,6 @@
 • GET    /metrics/by_job/:job_id              → Metrics by Job ID              → 200 OK (Vec<JobMetric>)
 • GET    /metrics/by_worker/:worker_id        → Metrics by Worker ID           → 200 OK (Vec<JobMetric>)
 • GET    /metrics/recent/:job_id              → Most recent metric for Job     → 200 OK (Option<JobMetric>)
-• GET    /metrics/chronological/:job_id       → Chronological metrics for Job  → 200 OK (Vec<JobMetric>)
 • GET    /metrics/worker_stream/:worker_id    → Worker metric stream           → 200 OK (Vec<JobMetric>)
 
 ======================================================================== */
@@ -53,6 +52,66 @@ mod job_metric_api_tests {
         assert_eq!(metric.duration_sec, Some(42));
         assert_eq!(metric.exit_code, Some(0));
 
+        delete_job_via_api(&client, job.id).await;
+        delete_worker_via_api(&client, worker.id).await;
+        delete_user_via_api(&client, user.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_metric_upsert_updates_existing_row() {
+        let (client, user, jobs, _) = build_client_and_user_with_n_jobs(1).await;
+        let job = &jobs[0];
+        let worker = create_worker_via_api(&client, user.id).await;
+        assign_job_to_worker(&client, job.id, worker.id).await;
+
+        // First metric creation
+        let payload_1 = json!({
+            "job_id": job.id,
+            "worker_id": worker.id,
+            "duration_sec": 10,
+            "cpu_usage_pct": 50.0,
+            "mem_usage_mb": 100.0,
+            "exit_code": 0
+        });
+
+        let create_url = format!("{}/metrics", APP_HOST);
+        let res_1 = client
+            .post(&create_url)
+            .json(&payload_1)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(res_1.status().as_u16(), 201);
+        let metric_1: JobMetric = res_1.json().await.unwrap();
+
+        // Second metric creation for the same (job_id, worker_id) — should overwrite
+        let payload_2 = json!({
+            "job_id": job.id,
+            "worker_id": worker.id,
+            "duration_sec": 99,
+            "cpu_usage_pct": 88.8,
+            "mem_usage_mb": 256.0,
+            "exit_code": 137
+        });
+
+        let res_2 = client
+            .post(&create_url)
+            .json(&payload_2)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(res_2.status().as_u16(), 201);
+        let metric_2: JobMetric = res_2.json().await.unwrap();
+
+        // Should be the same row ID (i.e., it was updated)
+        assert_eq!(metric_1.id, metric_2.id);
+
+        // Check updated values are reflected
+        assert_eq!(metric_2.duration_sec, Some(99));
+        assert_eq!(metric_2.cpu_usage_pct, Some(88.8));
+        assert_eq!(metric_2.exit_code, Some(137));
+
+        // Clean up
         delete_job_via_api(&client, job.id).await;
         delete_worker_via_api(&client, worker.id).await;
         delete_user_via_api(&client, user.id).await;
@@ -143,8 +202,7 @@ mod job_metric_api_tests {
             .send()
             .await
             .unwrap();
-        let metrics: Vec<JobMetric> = res.json().await.unwrap();
-        assert_eq!(metrics.len(), 1);
+        let metrics: JobMetric = res.json().await.unwrap();
 
         delete_job_via_api(&client, job.id).await;
         delete_worker_via_api(&client, worker.id).await;
@@ -209,41 +267,6 @@ mod job_metric_api_tests {
             .unwrap();
         let recent: Option<JobMetric> = res.json().await.unwrap();
         assert!(recent.is_some());
-
-        delete_job_via_api(&client, job.id).await;
-        delete_worker_via_api(&client, worker.id).await;
-        delete_user_via_api(&client, user.id).await;
-    }
-
-    #[tokio::test]
-    async fn test_get_chronological_metrics_for_job() {
-        let (client, user, jobs, _) = build_client_and_user_with_n_jobs(1).await;
-        let job = &jobs[0];
-        let worker = create_worker_via_api(&client, user.id).await;
-        assign_job_to_worker(&client, job.id, worker.id).await;
-
-        for i in 0..5 {
-            let payload = json!({
-                "job_id": job.id,
-                "worker_id": worker.id,
-                "exit_code": i
-            });
-            client
-                .post(&format!("{}/metrics", APP_HOST))
-                .json(&payload)
-                .send()
-                .await
-                .unwrap();
-            sleep(Duration::from_millis(10)).await;
-        }
-
-        let res = client
-            .get(&format!("{}/metrics/chronological/{}", APP_HOST, job.id))
-            .send()
-            .await
-            .unwrap();
-        let metrics: Vec<JobMetric> = res.json().await.unwrap();
-        assert!(metrics.windows(2).all(|w| w[0].timestamp <= w[1].timestamp));
 
         delete_job_via_api(&client, job.id).await;
         delete_worker_via_api(&client, worker.id).await;

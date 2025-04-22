@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::str::FromStr;
 
-#[derive(AsExpression, Debug, FromSqlRow, Serialize, Deserialize)]
+#[derive(AsExpression, Debug, FromSqlRow, Serialize, Deserialize, PartialEq)]
 #[diesel(sql_type = diesel::sql_types::VarChar)]
 pub enum OutputTypeEnum {
     Stdout,

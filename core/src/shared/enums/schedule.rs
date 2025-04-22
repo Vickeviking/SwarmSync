@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::str::FromStr;
 
-#[derive(AsExpression, Debug, FromSqlRow, Serialize, Deserialize, Clone)]
+#[derive(AsExpression, Debug, FromSqlRow, Serialize, Deserialize, Clone, PartialEq)]
 #[diesel(sql_type = diesel::sql_types::VarChar)]
 pub enum ScheduleTypeEnum {
     Once,
