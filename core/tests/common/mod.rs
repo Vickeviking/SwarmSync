@@ -3,9 +3,9 @@ use diesel_async::AsyncPgConnection;
 use reqwest::{header, Client, ClientBuilder, StatusCode};
 use serde_json::json;
 use swarmsync_core::commands;
-use swarmsync_core::database::models::job::{Job, JobAssignment};
+use swarmsync_core::database::models::job::{Job, JobAssignment, JobMetric, JobResult};
 use swarmsync_core::database::models::user::{User, UserResponse};
-use swarmsync_core::database::models::worker::Worker;
+use swarmsync_core::database::models::worker::{Worker, WorkerStatus};
 use swarmsync_core::database::repositories::user::UserRepository;
 use swarmsync_core::database::repositories::{JobAssignmentRepository, JobRepository};
 use uuid::Uuid;
@@ -273,7 +273,7 @@ pub async fn mark_assignment_started_via_api(
         "job_id": assignment.job_id,
         "worker_id": assignment.worker_id,
         "assigned_at": assignment.assigned_at,
-        "started_at": Some(started_at),  // Adding the started_at value
+        "started_at": started_at.to_string(),
         "finished_at": assignment.finished_at,
     });
 
@@ -311,7 +311,7 @@ pub async fn mark_assignment_finished_via_api(
         "worker_id": assignment.worker_id,
         "assigned_at": assignment.assigned_at,
         "started_at": assignment.started_at,
-        "finished_at": Some(finished_at), // Adding the finished_at value
+        "finished_at": finished_at.to_string(), // Adding the finished_at value
     });
 
     // Send the PATCH request
@@ -327,6 +327,74 @@ pub async fn mark_assignment_finished_via_api(
 
     // Assert that the request was successful
     assert_eq!(resp.status(), StatusCode::OK);
+}
+
+// Metrics
+pub async fn create_metric_via_api(
+    client: &Client,
+    job_id: i32,
+    worker_id: i32,
+    duration_sec: i32,
+    cpu_usage_pct: f32,
+    mem_usage_mb: f32,
+    exit_code: i32,
+) -> JobMetric {
+    let payload = json!({
+        "job_id": job_id,
+        "worker_id": worker_id,
+        "duration_sec": duration_sec,
+        "cpu_usage_pct": cpu_usage_pct,
+        "mem_usage_mb": mem_usage_mb,
+        "exit_code": exit_code
+    });
+
+    let res = client
+        .post(&format!("{}/metrics", APP_HOST))
+        .json(&payload)
+        .send()
+        .await
+        .expect("Failed to send create-metric request");
+
+    assert!(
+        res.status().is_success(),
+        "Metric creation failed (status={}): {:?}",
+        res.status(),
+        res.text().await.unwrap_or_default()
+    );
+
+    res.json::<JobMetric>()
+        .await
+        .expect("Failed to deserialize JobMetric from create response")
+}
+
+// JOb result
+pub async fn assign_result_to_job(client: &Client, job_id: i32) -> JobResult {
+    let payload = json!({
+        "job_id": job_id,
+        "stdout": Some("Execution finished successfully."),
+        "files": vec![
+            "result.log".to_string(),
+            "output.json".to_string()
+        ]
+    });
+
+    let res = client
+        .post(&format!("{}/results", APP_HOST))
+        .json(&payload)
+        .send()
+        .await
+        .expect("Failed to send POST /results");
+
+    assert!(
+        res.status().is_success(),
+        "JobResult creation failed (status={}): {:?}",
+        res.status(),
+        res.text().await.unwrap_or_default()
+    );
+
+    res.json::<JobResult>()
+        .await
+        .expect("Failed to deserialize JobResult")
 }
 
 // ======== Worker Utilities ==========
@@ -398,4 +466,33 @@ pub async fn delete_worker_via_api(client: &Client, worker_id: i32) {
         res.status(),
         res.text().await.unwrap_or_default()
     );
+}
+
+pub async fn create_worker_status_via_api(
+    client: &Client,
+    worker_id: i32,
+    job_id: Option<i32>,
+) -> WorkerStatus {
+    let status_data = json!({
+        "worker_id": worker_id,
+        "status": "Idle",
+        "last_heartbeat": null,
+        "active_job_id": job_id,
+        "uptime_sec": 3600,
+        "load_avg": [Some(0.5), Some(0.3), Some(0.1)],
+        "last_error": "No errors"
+    });
+
+    let res = client
+        .post(&format!("{}/worker-status", APP_HOST))
+        .json(&status_data)
+        .send()
+        .await
+        .expect("Failed to send request to create worker status");
+
+    assert_eq!(res.status(), StatusCode::CREATED, "Expected 201 Created");
+
+    res.json::<WorkerStatus>()
+        .await
+        .expect("Failed to parse created WorkerStatus")
 }

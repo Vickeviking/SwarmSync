@@ -21,7 +21,7 @@ CREATE TABLE worker_status (
     worker_id SERIAL UNIQUE REFERENCES workers(id) ON DELETE CASCADE,
     status varchar(64) NOT NULL,
     last_heartbeat TIMESTAMP,
-    active_job_id INTEGER REFERENCES jobs(id),  -- Nullable reference to a current job
+    active_job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL, -- Nullable reference to a current job
     uptime_sec INTEGER,
     load_avg REAL[],  -- e.g., [1min, 5min, 15min] load averages
     last_error TEXT,

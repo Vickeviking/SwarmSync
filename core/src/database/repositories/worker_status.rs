@@ -24,7 +24,7 @@ use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use crate::database::models::worker::{NewWorkerStatus, WorkerStatus};
 use crate::database::schema::*;
 use crate::shared::enums::workers::WorkerStatusEnum;
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, Utc};
 
 pub struct WorkerStatusRepository;
 
@@ -68,10 +68,9 @@ impl WorkerStatusRepository {
     pub async fn update_last_heartbeat(
         c: &mut AsyncPgConnection,
         id: i32,
-        last_heartbeat: NaiveDateTime,
     ) -> QueryResult<WorkerStatus> {
         diesel::update(worker_status::table.find(id))
-            .set(worker_status::last_heartbeat.eq(last_heartbeat))
+            .set(worker_status::last_heartbeat.eq(Utc::now().naive_utc()))
             .get_result(c)
             .await
     }
@@ -81,10 +80,17 @@ impl WorkerStatusRepository {
         id: i32,
         active_job_id: Option<i32>,
     ) -> QueryResult<WorkerStatus> {
-        diesel::update(worker_status::table.find(id))
+        let query = diesel::update(worker_status::table.find(id))
             .set(worker_status::active_job_id.eq(active_job_id))
-            .get_result(c)
-            .await
+            .get_result::<WorkerStatus>(c);
+
+        match query.await {
+            Ok(res) => Ok(res),
+            Err(e) => {
+                eprintln!("🔥 Diesel error while updating active_job_id: {}", e);
+                Err(e)
+            }
+        }
     }
 
     pub async fn update_uptime(

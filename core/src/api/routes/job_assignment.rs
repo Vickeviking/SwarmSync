@@ -3,6 +3,7 @@ use crate::database::models::job::{JobAssignment, NewJobAssignment};
 use crate::database::repositories::JobAssignmentRepository;
 
 use crate::database::models::user::User;
+use crate::utils::parsing;
 use chrono::NaiveDateTime;
 use rocket::http::Status;
 use rocket::response::status::Custom;
@@ -155,9 +156,9 @@ async fn get_assignments_for_worker_in_range(
     end: &str,
     _user: User,
 ) -> Result<Json<Vec<JobAssignment>>, Custom<Json<Value>>> {
-    let start = NaiveDateTime::parse_from_str(start, "%Y-%m-%d %H:%M:%S")
+    let start = parsing::parse_naive_datetime(start)
         .map_err(|_| Custom(Status::BadRequest, Json(json!({"error":"invalid start"}))))?;
-    let end = NaiveDateTime::parse_from_str(end, "%Y-%m-%d %H:%M:%S")
+    let end = parsing::parse_naive_datetime(end)
         .map_err(|_| Custom(Status::BadRequest, Json(json!({"error":"invalid end"}))))?;
 
     JobAssignmentRepository::find_assignments_for_worker_in_time_range(
@@ -199,12 +200,8 @@ async fn update_started_at(
     _user: User,
 ) -> Result<Json<JobAssignment>, Custom<serde_json::Value>> {
     if let Some(started_at_str) = started_at.get("started_at").and_then(Value::as_str) {
-        let started_at = NaiveDateTime::parse_from_str(started_at_str, "%+").map_err(|e| {
-            Custom(
-                Status::BadRequest,
-                json!({ "error": format!("Invalid date-time format: {}", e) }),
-            )
-        })?;
+        let started_at = parsing::parse_naive_datetime(started_at_str)
+            .map_err(|e| Custom(Status::BadRequest, json!({ "error": e })))?;
 
         JobAssignmentRepository::update_started_at(&mut db, id, started_at)
             .await
@@ -231,12 +228,8 @@ async fn update_finished_at(
     _user: User,
 ) -> Result<Json<JobAssignment>, Custom<serde_json::Value>> {
     if let Some(finished_at_str) = finished_at.get("finished_at").and_then(Value::as_str) {
-        let finished_at = NaiveDateTime::parse_from_str(finished_at_str, "%+").map_err(|e| {
-            Custom(
-                Status::BadRequest,
-                json!({ "error": format!("Invalid date-time format: {}", e) }),
-            )
-        })?;
+        let finished_at = parsing::parse_naive_datetime(finished_at_str)
+            .map_err(|e| Custom(Status::BadRequest, json!({ "error": e })))?;
 
         JobAssignmentRepository::update_finished_at(&mut db, id, finished_at)
             .await

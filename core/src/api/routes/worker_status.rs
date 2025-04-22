@@ -45,14 +45,18 @@ pub fn routes() -> Vec<Route> {
 • PUT     /worker-status/:id/last-error       → Update last error message               → 200 OK (WorkerStatus)
 
 ======================================================================== */
-
+use chrono::Utc;
+use serde::Deserialize;
 // ===== CRUD =====
 #[post("/worker-status", format = "json", data = "<new_status>")]
 pub async fn create_worker_status(
     mut conn: Connection<DbConn>,
-    new_status: Json<NewWorkerStatus>,
+    mut new_status: Json<NewWorkerStatus>,
     _user: User,
 ) -> Result<Custom<Json<WorkerStatus>>, Custom<Json<Value>>> {
+    if new_status.last_heartbeat.is_none() {
+        new_status.last_heartbeat = Some(Utc::now().naive_utc());
+    }
     WorkerStatusRepository::create(&mut conn, new_status.into_inner())
         .await
         .map(|ws| Custom(Status::Created, Json(ws)))
@@ -130,14 +134,13 @@ pub async fn update_status(
         })
 }
 
-#[put("/worker-status/<id>/last-heartbeat", format = "json", data = "<hb>")]
+#[put("/worker-status/<id>/last-heartbeat")]
 pub async fn update_last_heartbeat(
     mut conn: Connection<DbConn>,
     id: i32,
-    hb: Json<NaiveDateTime>,
     _user: User,
 ) -> Result<Custom<Json<WorkerStatus>>, Custom<Json<Value>>> {
-    WorkerStatusRepository::update_last_heartbeat(&mut conn, id, hb.into_inner())
+    WorkerStatusRepository::update_last_heartbeat(&mut conn, id)
         .await
         .map(|ws| Custom(Status::Ok, Json(ws)))
         .map_err(|e| {
@@ -148,82 +151,93 @@ pub async fn update_last_heartbeat(
         })
 }
 
-#[put(
-    "/worker-status/<id>/active-job-id",
-    format = "json",
-    data = "<job_id>"
-)]
+#[derive(Deserialize)]
+pub struct UpdateActiveJobId {
+    active_job_id: Option<i32>,
+}
+
+#[put("/worker-status/<id>/active-job-id", format = "json", data = "<data>")]
 pub async fn update_active_job_id(
     mut conn: Connection<DbConn>,
     id: i32,
-    job_id: Json<Option<i32>>,
+    data: Json<UpdateActiveJobId>,
     _user: User,
-) -> Result<Custom<Json<WorkerStatus>>, Custom<Json<Value>>> {
-    WorkerStatusRepository::update_active_job_id(&mut conn, id, job_id.into_inner())
+) -> Result<Custom<Json<WorkerStatus>>, Custom<Json<serde_json::Value>>> {
+    WorkerStatusRepository::update_active_job_id(&mut conn, id, data.active_job_id)
         .await
         .map(|ws| Custom(Status::Ok, Json(ws)))
         .map_err(|e| {
             Custom(
                 Status::InternalServerError,
-                Json(json!({"error": e.to_string()})),
+                Json(json!({ "error": e.to_string() })),
             )
         })
 }
 
-#[put("/worker-status/<id>/uptime", format = "json", data = "<uptime>")]
+#[put("/worker-status/<id>/uptime", format = "json", data = "<data>")]
 pub async fn update_uptime(
     mut conn: Connection<DbConn>,
     id: i32,
-    uptime: Json<Option<i32>>,
+    data: Json<serde_json::Value>,
     _user: User,
-) -> Result<Custom<Json<WorkerStatus>>, Custom<Json<Value>>> {
-    WorkerStatusRepository::update_uptime(&mut conn, id, uptime.into_inner())
+) -> Result<Custom<Json<WorkerStatus>>, Custom<Json<serde_json::Value>>> {
+    let uptime = data.get("uptime").and_then(Value::as_i64).map(|v| v as i32);
+
+    WorkerStatusRepository::update_uptime(&mut conn, id, uptime)
         .await
         .map(|ws| Custom(Status::Ok, Json(ws)))
         .map_err(|e| {
             Custom(
                 Status::InternalServerError,
-                Json(json!({"error": e.to_string()})),
+                Json(json!({ "error": e.to_string() })),
             )
         })
 }
 
-#[put("/worker-status/<id>/load-avg", format = "json", data = "<load_avg>")]
+#[put("/worker-status/<id>/load-avg", format = "json", data = "<data>")]
 pub async fn update_load_avg(
     mut conn: Connection<DbConn>,
     id: i32,
-    load_avg: Json<Option<Vec<f32>>>,
+    data: Json<serde_json::Value>,
     _user: User,
-) -> Result<Custom<Json<WorkerStatus>>, Custom<Json<Value>>> {
-    WorkerStatusRepository::update_load_avg(&mut conn, id, load_avg.into_inner())
+) -> Result<Custom<Json<WorkerStatus>>, Custom<Json<serde_json::Value>>> {
+    let load_avg = data.get("load_avg").and_then(Value::as_array).map(|arr| {
+        arr.iter()
+            .filter_map(Value::as_f64)
+            .map(|f| f as f32)
+            .collect::<Vec<f32>>()
+    });
+
+    WorkerStatusRepository::update_load_avg(&mut conn, id, load_avg)
         .await
         .map(|ws| Custom(Status::Ok, Json(ws)))
         .map_err(|e| {
             Custom(
                 Status::InternalServerError,
-                Json(json!({"error": e.to_string()})),
+                Json(json!({ "error": e.to_string() })),
             )
         })
 }
 
-#[put(
-    "/worker-status/<id>/last-error",
-    format = "json",
-    data = "<last_error>"
-)]
+#[put("/worker-status/<id>/last-error", format = "json", data = "<data>")]
 pub async fn update_last_error(
     mut conn: Connection<DbConn>,
     id: i32,
-    last_error: Json<Option<String>>,
+    data: Json<serde_json::Value>,
     _user: User,
-) -> Result<Custom<Json<WorkerStatus>>, Custom<Json<Value>>> {
-    WorkerStatusRepository::update_last_error(&mut conn, id, last_error.into_inner())
+) -> Result<Custom<Json<WorkerStatus>>, Custom<Json<serde_json::Value>>> {
+    let last_error = data
+        .get("last_error")
+        .and_then(Value::as_str)
+        .map(String::from);
+
+    WorkerStatusRepository::update_last_error(&mut conn, id, last_error)
         .await
         .map(|ws| Custom(Status::Ok, Json(ws)))
         .map_err(|e| {
             Custom(
                 Status::InternalServerError,
-                Json(json!({"error": e.to_string()})),
+                Json(json!({ "error": e.to_string() })),
             )
         })
 }

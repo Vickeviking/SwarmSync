@@ -33,6 +33,24 @@ impl WorkerRepository {
             .await
     }
 
+    pub async fn update(c: &mut AsyncPgConnection, id: i32, worker: Worker) -> QueryResult<Worker> {
+        diesel::update(workers::table.find(id))
+            .set((
+                workers::label.eq(worker.label),
+                workers::ip_address.eq(worker.ip_address),
+                workers::hostname.eq(worker.hostname),
+                workers::ssh_user.eq(worker.ssh_user),
+                workers::ssh_key.eq(worker.ssh_key),
+                workers::docker_version.eq(worker.docker_version),
+                workers::arch.eq(worker.arch),
+                workers::os.eq(worker.os),
+                workers::tags.eq(worker.tags),
+                workers::last_seen_at.eq(worker.last_seen_at),
+            ))
+            .get_result(c)
+            .await
+    }
+
     pub async fn find_by_id(c: &mut AsyncPgConnection, id: i32) -> QueryResult<Worker> {
         workers::table.find(id).get_result(c).await
     }

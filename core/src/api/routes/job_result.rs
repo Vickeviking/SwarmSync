@@ -7,6 +7,7 @@ use rocket::response::status::Custom;
 use rocket::serde::json::{json, Json};
 use rocket::{delete, get, patch, post, routes, Route};
 use rocket_db_pools::Connection;
+use serde::Deserialize;
 
 pub fn routes() -> Vec<Route> {
     routes![
@@ -139,14 +140,27 @@ pub async fn get_most_recent_result_for_job(
 }
 
 // ===== Field Updates =====
-#[patch("/results/<id>/stdout", format = "json", data = "<new_stdout>")]
+#[derive(Debug, Deserialize)]
+pub struct UpdateStdoutPayload {
+    pub stdout: Option<String>,
+}
+
+#[patch("/results/<id>/stdout", format = "json", data = "<payload>")]
 pub async fn update_stdout(
     mut db: Connection<DbConn>,
     id: i32,
-    new_stdout: Json<Option<String>>,
+    payload: Json<serde_json::Value>,
     _user: User,
 ) -> Result<Json<JobResult>, Custom<Json<serde_json::Value>>> {
-    JobResultRepository::update_stdout(&mut db, id, new_stdout.into_inner())
+    let extracted: UpdateStdoutPayload =
+        serde_json::from_value(payload.into_inner()).map_err(|e| {
+            Custom(
+                Status::UnprocessableEntity,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    JobResultRepository::update_stdout(&mut db, id, extracted.stdout)
         .await
         .map(Json)
         .map_err(|e| {
@@ -157,14 +171,26 @@ pub async fn update_stdout(
         })
 }
 
-#[patch("/results/<id>/files", format = "json", data = "<new_files>")]
+#[derive(Debug, Deserialize)]
+pub struct UpdateFilesPayload {
+    pub files: Option<Vec<String>>,
+}
+#[patch("/results/<id>/files", format = "json", data = "<payload>")]
 pub async fn update_files(
     mut db: Connection<DbConn>,
     id: i32,
-    new_files: Json<Option<Vec<String>>>,
+    payload: Json<serde_json::Value>,
     _user: User,
 ) -> Result<Json<JobResult>, Custom<Json<serde_json::Value>>> {
-    JobResultRepository::update_files(&mut db, id, new_files.into_inner())
+    let extracted: UpdateFilesPayload =
+        serde_json::from_value(payload.into_inner()).map_err(|e| {
+            Custom(
+                Status::UnprocessableEntity,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    JobResultRepository::update_files(&mut db, id, extracted.files)
         .await
         .map(Json)
         .map_err(|e| {

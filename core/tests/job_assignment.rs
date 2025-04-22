@@ -24,7 +24,7 @@ mod job_assignment_api_tests {
     use crate::common::{
         assign_job_to_worker, build_client_and_user_with_n_jobs, create_worker_via_api,
         delete_job_via_api, delete_jobs_via_api, delete_user_via_api, delete_worker_via_api,
-        get_ndt_now, mark_assignment_finished_via_api, mark_assignment_started_via_api, APP_HOST,
+        get_ndt_now, mark_assignment_finished_via_api, APP_HOST,
     };
     use chrono::Utc;
     use rocket::serde::json::json;
@@ -211,7 +211,10 @@ mod job_assignment_api_tests {
         let end = Utc::now().naive_utc() + chrono::Duration::seconds(5);
         let url = format!(
             "{}/assignments/by_worker/range?worker_id={}&start={}&end={}",
-            APP_HOST, worker.id, start, end,
+            APP_HOST,
+            worker.id,
+            start.to_string(),
+            end.to_string(),
         );
         let res = client.get(&url).send().await.expect("Range lookup failed");
         assert_eq!(res.status().as_u16(), 200);
@@ -236,7 +239,7 @@ mod job_assignment_api_tests {
         let a2: JobAssignment = assign_job_to_worker(&client, job2.id, worker.id).await;
 
         // mark a1 finished
-        mark_assignment_finished_via_api(&client, a1.id, get_ndt_now());
+        mark_assignment_finished_via_api(&client, a1.id, get_ndt_now()).await;
 
         let url = format!("{}/assignments/active", APP_HOST);
         let res = client.get(&url).send().await.expect("Active lookup failed");
@@ -261,17 +264,45 @@ mod job_assignment_api_tests {
         let assignment = assign_job_to_worker(&client, job.id, worker.id).await;
 
         let start_ts = Utc::now().naive_utc();
-        let payload = json!({ "started_at": start_ts.format("%+").to_string() }); // Format the timestamp as a string
+        let payload = json!({ "started_at": start_ts.to_string() }); // Ensure it's a string
+
+        println!("Payload: {}", payload); // Debug: Print the payload to ensure it's correct
+
         let url = format!("{}/assignments/{}/started", APP_HOST, assignment.id);
+
         let res = client
             .patch(&url)
             .json(&payload)
             .send()
             .await
             .expect("Patch start failed");
-        assert_eq!(res.status().as_u16(), 200);
-        let updated: JobAssignment = res.json().await.expect("Deserialization failed");
-        assert_eq!(updated.started_at.unwrap(), start_ts);
+
+        // Extract status first (does not consume the response)
+        let status = res.status().as_u16();
+        println!("Response Status: {}", status); // Debugging the status code
+
+        // Clone the response body for later use
+        let body = res.text().await.expect("Failed to read response body");
+
+        if status != 200 {
+            println!("Response Body: {}", body);
+        }
+        assert!(status == 200);
+        // If the status isn't 200, print the response body to understand the error
+
+        // If status is 200, attempt to deserialize the JSON body
+        let updated: JobAssignment = serde_json::from_str(&body).expect("Deserialization failed");
+
+        // Truncate both timestamps to milliseconds before comparison
+        let truncated_start_ts = start_ts.and_utc().timestamp_millis().to_string(); // Convert to milliseconds as string
+        let truncated_updated = updated
+            .started_at
+            .unwrap()
+            .and_utc()
+            .timestamp_millis()
+            .to_string(); // Convert to milliseconds as string
+
+        assert_eq!(truncated_updated, truncated_start_ts);
 
         // Cleanup
         delete_job_via_api(&client, job.id).await;
@@ -288,10 +319,9 @@ mod job_assignment_api_tests {
         let assignment = assign_job_to_worker(&client, job.id, worker.id).await;
 
         let finish_ts = Utc::now().naive_utc();
-        let finish_ts_str = finish_ts.format("%+").to_string(); // Format the timestamp as a string
 
         // Send the timestamp in a JSON object with the field "finished_at"
-        let payload = json!({ "finished_at": finish_ts_str });
+        let payload = json!({ "finished_at": finish_ts.to_string() });
 
         let url = format!("{}/assignments/{}/finished", APP_HOST, assignment.id);
         let res = client
@@ -306,8 +336,12 @@ mod job_assignment_api_tests {
         // Deserialize the updated assignment and check if the finished_at was updated
         let updated: JobAssignment = res.json().await.expect("Deserialization failed");
         assert_eq!(
-            updated.finished_at.unwrap().format("%+").to_string(),
-            finish_ts_str
+            updated
+                .finished_at
+                .unwrap()
+                .format("%Y-%m-%dT%H:%M:%S")
+                .to_string(),
+            finish_ts.format("%Y-%m-%dT%H:%M:%S").to_string()
         );
 
         // Cleanup

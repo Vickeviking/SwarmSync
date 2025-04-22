@@ -3,11 +3,12 @@ use crate::database::models::worker::{NewWorker, Worker};
 use crate::database::repositories::WorkerRepository;
 
 use crate::database::models::user::User;
+use crate::utils::parsing;
 use chrono::NaiveDateTime;
 use rocket::http::Status;
 use rocket::response::status::{Custom, NoContent};
 use rocket::serde::json::{json, Json, Value};
-use rocket::{delete, get, post, put, routes, Route};
+use rocket::{delete, get, patch, post, put, routes, Route};
 use rocket_db_pools::Connection;
 
 // === Mount routes ===
@@ -21,6 +22,7 @@ pub fn routes() -> Vec<Route> {
         find_worker_by_ip,
         list_workers_by_admin,
         update_last_seen,
+        update_worker,
     ]
 }
 
@@ -30,6 +32,7 @@ pub fn routes() -> Vec<Route> {
 • POST    /workers                           → Create new worker (NewWorker)      → 201 Created (Worker)
 • GET     /workers/:id                       → Fetch worker by ID                 → 200 OK (Worker)
 • DELETE  /workers/:id                       → Delete worker by ID                → 204 No Content
+• PUT     /workers/:id                       → Update worker by ID                → 200 OK (Worker)
 
 == 🔍 Lookup & Search ==
 • GET     /workers/admin/:admin_id           → Workers by Admin ID                → 200 OK (Vec<Worker>)
@@ -56,6 +59,24 @@ pub async fn create_worker(
             Custom(
                 Status::InternalServerError,
                 Json(json!({"error": e.to_string()})),
+            )
+        })
+}
+
+#[patch("/workers/<id>", format = "json", data = "<worker>")]
+pub async fn update_worker(
+    mut db: Connection<DbConn>,
+    id: i32,
+    worker: Json<Worker>,
+    _user: User,
+) -> Result<Json<Worker>, Custom<Json<serde_json::Value>>> {
+    WorkerRepository::update(&mut db, id, worker.into_inner())
+        .await
+        .map(Json)
+        .map_err(|e| {
+            Custom(
+                Status::InternalServerError,
+                Json(json!({ "error": e.to_string() })),
             )
         })
 }
@@ -163,20 +184,31 @@ pub async fn list_workers_by_admin(
 }
 
 // ===== State Update =====
-#[put("/workers/<id>/last-seen", format = "json", data = "<new_last_seen>")]
+#[put("/workers/<id>/last-seen", format = "json", data = "<last_seen>")]
 pub async fn update_last_seen(
     mut conn: Connection<DbConn>,
     id: i32,
-    new_last_seen: Json<NaiveDateTime>,
+    last_seen: Json<Value>,
     _user: User,
 ) -> Result<Custom<Json<Worker>>, Custom<Json<Value>>> {
-    WorkerRepository::update_last_seen_at(&mut conn, id, new_last_seen.into_inner())
-        .await
-        .map(|w| Custom(Status::Ok, Json(w)))
-        .map_err(|e| {
-            Custom(
-                Status::InternalServerError,
-                Json(json!({"error": e.to_string()})),
-            )
-        })
+    if let Some(last_seen_str) = last_seen.get("last_seen_at").and_then(Value::as_str) {
+        // Use the parse_naive_datetime function for flexible date parsing
+        let parsed = parsing::parse_naive_datetime(last_seen_str)
+            .map_err(|e| Custom(Status::BadRequest, Json(json!({ "error": e }))))?;
+
+        WorkerRepository::update_last_seen_at(&mut conn, id, parsed)
+            .await
+            .map(|w| Custom(Status::Ok, Json(w)))
+            .map_err(|e| {
+                Custom(
+                    Status::InternalServerError,
+                    Json(json!({ "error": e.to_string() })),
+                )
+            })
+    } else {
+        Err(Custom(
+            Status::BadRequest,
+            Json(json!({ "error": "Missing or invalid 'last_seen_at'" })),
+        ))
+    }
 }
