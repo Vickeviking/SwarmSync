@@ -1,5 +1,8 @@
 // src/cli/views/jobs.rs
-use crate::cli::utils::{select_assignment, select_job, select_user, select_worker};
+use crate::cli::utils::{
+    select_assignment, select_job, select_job_with_any, select_user, select_worker,
+    select_worker_with_any,
+};
 use crate::commands;
 use crate::shared::enums::{
     image_format::ImageFormatEnum, output::OutputTypeEnum, schedule::ScheduleTypeEnum,
@@ -9,10 +12,9 @@ pub async fn user_perspective_menu() -> anyhow::Result<()> {
     loop {
         let options = vec![
             "Back",
-            "Job CRUD",
-            "Worker CRUD",
-            "Job-work Assignments",
-            "Visualize Job Assignments",
+            "Jobs (Create / List / Delete)",
+            "Workers (Create / Update / Delete)",
+            "Assignments (Link / Inspect)",
         ];
 
         let selection = Select::with_theme(&ColorfulTheme::default())
@@ -26,7 +28,6 @@ pub async fn user_perspective_menu() -> anyhow::Result<()> {
             1 => job_crud().await?,
             2 => worker_crud().await?,
             3 => assign_job().await?,
-            4 => visualize_jobs().await?,
             _ => unreachable!(),
         }
     }
@@ -178,7 +179,12 @@ async fn worker_crud() -> anyhow::Result<()> {
 }
 
 async fn assign_job() -> anyhow::Result<()> {
-    let options = vec!["Back", "Assign Job", "Delete Assignment"];
+    let options = vec![
+        "Back",
+        "Assign Job",
+        "Delete Assignment",
+        "List Assignments",
+    ];
 
     loop {
         let choice = Select::with_theme(&ColorfulTheme::default())
@@ -199,14 +205,16 @@ async fn assign_job() -> anyhow::Result<()> {
                 let assignment_id: i32 = select_assignment().await.unwrap();
                 commands::delete_assignment(assignment_id).await;
             }
+            3 => {
+                let user_id: i32 = select_user().await.unwrap();
+                let job_id: Option<i32> = select_job_with_any(user_id).await.unwrap_or(None);
+                let worker_id: Option<i32> = select_worker_with_any(user_id).await.unwrap_or(None);
+
+                commands::list_assignments_filtered(user_id, job_id, worker_id).await;
+            }
             _ => unreachable!(),
         }
     }
 
-    Ok(())
-}
-
-async fn visualize_jobs() -> anyhow::Result<()> {
-    println!("[stub] Visualizing job to worker assignments");
     Ok(())
 }

@@ -4,10 +4,10 @@ use dialoguer::{theme::ColorfulTheme, Select};
 pub async fn main_menu() -> anyhow::Result<()> {
     loop {
         let options = vec![
-            "Quit",
-            "User Management",
-            "User Perspective",
-            "Visualize Graph",
+            "Exit",
+            "Manage Users",
+            "Manage Jobs & Workers",
+            "System Graph View",
         ];
 
         let choice = Select::with_theme(&ColorfulTheme::default())

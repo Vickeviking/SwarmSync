@@ -34,6 +34,12 @@ pub async fn create_user(username: String, email: String, password: String) {
     println!("✅ Created user: {} ({})", created.username, created.email);
 }
 
+pub async fn get_user_by_id(id: i32) -> Result<User, anyhow::Error> {
+    let mut c = load_db_connection().await;
+    let user = UserRepository::find_by_id(&mut c, id).await?;
+    Ok(user)
+}
+
 pub async fn list_users(limit: i64, offset: i64) {
     let mut c = load_db_connection().await;
 
@@ -275,4 +281,36 @@ pub async fn get_assignments_for_user(user_id: i32) -> Result<Vec<JobAssignment>
         .collect();
 
     Ok(filtered)
+}
+
+pub async fn list_assignments_filtered(user_id: i32, job_id: Option<i32>, worker_id: Option<i32>) {
+    let mut c = load_db_connection().await;
+
+    let jobs = JobRepository::list_by_admin(&mut c, user_id, 100, 0)
+        .await
+        .unwrap_or_default();
+    let job_ids: Vec<i32> = jobs.iter().map(|j| j.id).collect();
+
+    let all = JobAssignmentRepository::list_active_assignments(&mut c)
+        .await
+        .unwrap_or_default();
+
+    let filtered = all
+        .into_iter()
+        .filter(|a| job_ids.contains(&a.job_id))
+        .filter(|a| job_id.map_or(true, |jid| a.job_id == jid))
+        .filter(|a| worker_id.map_or(true, |wid| a.worker_id == wid))
+        .collect::<Vec<_>>();
+
+    if filtered.is_empty() {
+        println!("📭 No matching assignments found.");
+    } else {
+        println!("🔗 Assignments:");
+        for a in filtered {
+            println!(
+                "- Job ID: {}, Worker ID: {}, Assigned: {}",
+                a.job_id, a.worker_id, a.assigned_at
+            );
+        }
+    }
 }

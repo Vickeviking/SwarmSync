@@ -44,6 +44,29 @@ pub async fn select_job(user_id: i32) -> Option<i32> {
     Some(jobs[selection].id)
 }
 
+pub async fn select_job_with_any(user_id: i32) -> Option<Option<i32>> {
+    let mut c = load_db_connection().await;
+    let jobs = JobRepository::list_by_admin(&mut c, user_id, 100, 0)
+        .await
+        .ok()?;
+
+    let mut choices = vec!["Any".to_string()];
+    choices.extend(jobs.iter().map(|j| format!("{} - {}", j.id, j.job_name)));
+
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Choose a job (or Any)")
+        .items(&choices)
+        .default(0)
+        .interact()
+        .ok()?;
+
+    if selection == 0 {
+        Some(None)
+    } else {
+        Some(Some(jobs[selection - 1].id))
+    }
+}
+
 pub async fn select_worker(user_id: i32) -> Option<i32> {
     let mut c = load_db_connection().await;
     let workers = WorkerRepository::list_workers_by_admin(&mut c, user_id, 100, 0)
@@ -62,6 +85,29 @@ pub async fn select_worker(user_id: i32) -> Option<i32> {
         .ok()?;
 
     Some(workers[selection].id)
+}
+
+pub async fn select_worker_with_any(user_id: i32) -> Option<Option<i32>> {
+    let mut c = load_db_connection().await;
+    let workers = WorkerRepository::list_workers_by_admin(&mut c, user_id, 100, 0)
+        .await
+        .ok()?;
+
+    let mut choices = vec!["Any".to_string()];
+    choices.extend(workers.iter().map(|w| format!("{} - {}", w.id, w.label)));
+
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Choose a worker (or Any)")
+        .items(&choices)
+        .default(0)
+        .interact()
+        .ok()?;
+
+    if selection == 0 {
+        Some(None)
+    } else {
+        Some(Some(workers[selection - 1].id))
+    }
 }
 
 pub async fn select_assignment() -> Option<i32> {
