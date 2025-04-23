@@ -8,8 +8,8 @@ name = "core"
 path = "src/bin/core.rs"
 
 [[bin]]
-name = "cli"
-path = "src/bin/cli.rs"
+name = "commanddeck"
+path = "src/bin/commanddeck.rs"
 
 
 [dependencies]
