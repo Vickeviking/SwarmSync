@@ -125,7 +125,7 @@ pub async fn create_full_job(
         schedule_type,
         cron_expression,
         notes: None,
-        state: JobStateEnum::Queued,
+        state: JobStateEnum::Submitted,
     };
 
     match JobRepository::create(&mut c, new_job).await {
@@ -160,6 +160,11 @@ pub async fn remove_job(job_id: i32) {
         Ok(_) => println!("⚠️ No job found with ID {}", job_id),
         Err(e) => eprintln!("❌ Error deleting job {}: {}", job_id, e),
     }
+}
+
+pub async fn get_job_by_id(id: i32) -> anyhow::Result<Job> {
+    let mut conn = load_db_connection().await;
+    Ok(JobRepository::find_by_id(&mut conn, id).await?)
 }
 
 // ======= WORKERS =========
@@ -281,6 +286,12 @@ pub async fn get_assignments_for_user(user_id: i32) -> Result<Vec<JobAssignment>
         .collect();
 
     Ok(filtered)
+}
+
+pub async fn get_assignment_id_for_job(job_id: i32) -> anyhow::Result<Option<i32>> {
+    let mut conn = load_db_connection().await;
+    let assignments = JobAssignmentRepository::find_by_job_id(&mut conn, job_id).await?;
+    Ok(assignments.get(0).map(|a| a.id))
 }
 
 pub async fn list_assignments_filtered(user_id: i32, job_id: Option<i32>, worker_id: Option<i32>) {

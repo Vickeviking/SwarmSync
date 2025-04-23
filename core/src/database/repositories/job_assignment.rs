@@ -1,13 +1,10 @@
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
-use crate::database::models::job::{
-    JobAssignment, NewJobAssignment,
-};
-
+use crate::cli::utils::mark_running;
+use crate::database::models::job::{JobAssignment, NewJobAssignment};
 
 use crate::database::schema::*;
-
 
 use chrono::NaiveDateTime;
 
@@ -19,6 +16,7 @@ impl JobAssignmentRepository {
         c: &mut AsyncPgConnection,
         new_assignment: NewJobAssignment,
     ) -> QueryResult<JobAssignment> {
+        let _ = mark_running(new_assignment.job_id).await;
         diesel::insert_into(job_assignments::table)
             .values(new_assignment)
             .get_result(c)

@@ -1,6 +1,6 @@
 // src/cli/views/jobs.rs
 use crate::cli::utils::{
-    select_assignment, select_job, select_job_with_any, select_user, select_worker,
+    move_job_state, select_assignment, select_job, select_job_with_any, select_user, select_worker,
     select_worker_with_any,
 };
 use crate::commands;
@@ -12,7 +12,7 @@ pub async fn user_perspective_menu() -> anyhow::Result<()> {
     loop {
         let options = vec![
             "Back",
-            "Jobs (Create / List / Delete)",
+            "Jobs (Create / List / Delete / Move through system)",
             "Workers (Create / Update / Delete)",
             "Assignments (Link / Inspect)",
         ];
@@ -37,7 +37,7 @@ pub async fn user_perspective_menu() -> anyhow::Result<()> {
 async fn job_crud() -> anyhow::Result<()> {
     let user_id: i32 = select_user().await.unwrap();
 
-    let options = vec!["Back", "List Jobs", "Create Job", "Delete Job"];
+    let options = vec!["Back", "List Jobs", "Create Job", "Delete Job", "Move Job"];
     loop {
         let choice = Select::with_theme(&ColorfulTheme::default())
             .with_prompt("Job CRUD Menu")
@@ -123,6 +123,10 @@ async fn job_crud() -> anyhow::Result<()> {
             3 => {
                 let job_id: i32 = select_job(user_id).await.unwrap();
                 commands::remove_job(job_id).await;
+            }
+            4 => {
+                let job_id: i32 = select_job(user_id).await.unwrap();
+                move_job_state(job_id).await?;
             }
             _ => unreachable!(),
         }

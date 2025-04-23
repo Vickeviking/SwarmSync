@@ -1,9 +1,12 @@
+use crate::commands;
 use crate::commands::load_db_connection;
 use crate::database::repositories::JobAssignmentRepository;
 use crate::database::{
     models::{job::Job, user::User, worker::Worker},
     repositories::{JobRepository, UserRepository, WorkerRepository},
 };
+use crate::shared::enums::job::JobStateEnum;
+use dialoguer::Input;
 use dialoguer::{theme::ColorfulTheme, Select};
 
 pub async fn select_user() -> Option<i32> {
@@ -144,4 +147,84 @@ pub async fn select_assignment() -> Option<i32> {
         .ok()?;
 
     Some(assignments[selection].id)
+}
+
+pub async fn move_job_state(job_id: i32) -> anyhow::Result<()> {
+    let job = commands::get_job_by_id(job_id).await?;
+    if job.state == JobStateEnum::Running {
+        println!("⚠️ Job is currently RUNNING.");
+
+        let confirm = Select::with_theme(&ColorfulTheme::default())
+            .with_prompt("To move this job, you must first remove its assignment. Continue?")
+            .items(&["Cancel", "Remove Assignment"])
+            .default(0)
+            .interact()?;
+
+        if confirm == 0 {
+            println!("❌ Move cancelled.");
+            return Ok(());
+        }
+
+        if let Some(assign_id) = commands::get_assignment_id_for_job(job_id).await? {
+            commands::delete_assignment(assign_id).await;
+            println!("🗑️ Assignment removed.");
+        } else {
+            println!("⚠️ No assignment found. Proceeding.");
+        }
+    }
+    let states = vec!["Submitted", "Queued", "Completed", "Failed"];
+    let choice = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Move Job To Which State?")
+        .default(0)
+        .items(&states)
+        .interact()?;
+
+    let result = match states[choice] {
+        "Submitted" => mark_submitted(job_id).await,
+        "Queued" => mark_queued(job_id).await,
+        "Completed" => mark_succeeded(job_id).await,
+        "Failed" => {
+            let msg: String = Input::with_theme(&ColorfulTheme::default())
+                .with_prompt("Failure message?")
+                .interact_text()?;
+            mark_failed(job_id, &msg).await
+        }
+        _ => unreachable!(),
+    };
+
+    match result {
+        Ok(job) => {
+            println!("✅ Job moved to {:?} successfully", job.state);
+        }
+        Err(e) => {
+            eprintln!("❌ Failed to move job: {}", e);
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn mark_submitted(id: i32) -> anyhow::Result<Job> {
+    let mut conn = load_db_connection().await;
+    Ok(JobRepository::mark_submitted(&mut conn, id).await?)
+}
+
+pub async fn mark_queued(id: i32) -> anyhow::Result<Job> {
+    let mut conn = load_db_connection().await;
+    Ok(JobRepository::mark_queued(&mut conn, id).await?)
+}
+
+pub async fn mark_running(id: i32) -> anyhow::Result<Job> {
+    let mut conn = load_db_connection().await;
+    Ok(JobRepository::mark_running(&mut conn, id).await?)
+}
+
+pub async fn mark_succeeded(id: i32) -> anyhow::Result<Job> {
+    let mut conn = load_db_connection().await;
+    Ok(JobRepository::mark_succeeded(&mut conn, id).await?)
+}
+
+pub async fn mark_failed(id: i32, message: &str) -> anyhow::Result<Job> {
+    let mut conn = load_db_connection().await;
+    Ok(JobRepository::mark_failed(&mut conn, id, message).await?)
 }

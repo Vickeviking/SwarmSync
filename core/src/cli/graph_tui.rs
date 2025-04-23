@@ -8,7 +8,7 @@ use crossterm::{
 };
 use ratatui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Direction as LayoutDirection, Layout, Rect},
+    layout::{Constraint, Direction as LayoutDirection, Layout},
     style::{Color, Modifier, Style},
     text::{Span, Spans, Text},
     widgets::{Block, Borders, Paragraph},
@@ -16,6 +16,7 @@ use ratatui::{
 };
 
 use crate::database::models::{job::Job, job::JobAssignment, worker::Worker};
+use crate::shared::enums::job::JobStateEnum;
 
 pub fn launch_graph_tui_with_data(
     user_name: &str,
@@ -54,51 +55,100 @@ fn run_app<B: ratatui::backend::Backend>(
     let mut selected_index = 0;
 
     loop {
-        let mut graph_lines = vec![
-            Spans::from(Span::styled(
-                format!("👤 User: {}", user_name),
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            )),
-            Spans::from(Span::raw("   │")),
-            Spans::from(Span::raw("   ▼")),
-            Spans::from(Span::styled(
-                "[Core System]",
-                Style::default().fg(Color::Yellow),
-            )),
-            Spans::from(Span::raw("   │")),
-        ];
-
-        let mut connected_worker_ids = vec![];
         let mut elements: Vec<(String, Text)> = vec![];
+        let mut selectable_indices = vec![];
+        let mut graph_lines = vec![];
+        let mut connected_worker_ids = vec![];
 
-        for job in jobs.iter() {
-            let mut line = format!("📦 {}", job.job_name);
-            let job_detail = format!("{}", job);
+        let mut index = 0;
 
-            if let Some(assignment) = assignments.iter().find(|a| a.job_id == job.id) {
-                if let Some(worker) = workers.iter().find(|w| w.id == assignment.worker_id) {
-                    line.push_str(&format!(" → 🛠️ {}", worker.label));
+        macro_rules! push_line {
+            ($line:expr, $text:expr) => {{
+                graph_lines.push(Spans::from(Span::raw(format!("   └─ {}", $line))));
+                selectable_indices.push(index);
+                elements.push(($line, $text));
+                index += 1;
+            }};
+        }
+
+        graph_lines.push(Spans::from(Span::styled(
+            format!("👤 User: {}", user_name),
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        )));
+        index += 1;
+
+        for job in jobs.iter().filter(|j| j.state == JobStateEnum::Submitted) {
+            push_line!(
+                format!("📦 {} (submitted)", job.job_name),
+                Text::from(format!("{}", job))
+            );
+        }
+
+        graph_lines.push(Spans::from(Span::styled(
+            "[Core Queue]",
+            Style::default().fg(Color::Yellow),
+        )));
+        index += 1;
+
+        for job in jobs.iter().filter(|j| j.state == JobStateEnum::Queued) {
+            push_line!(
+                format!("📦 {} (queued)", job.job_name),
+                Text::from(format!("{}", job))
+            );
+        }
+
+        graph_lines.push(Spans::from(Span::styled(
+            "[Workers]",
+            Style::default().fg(Color::Cyan),
+        )));
+        index += 1;
+
+        for job in jobs.iter().filter(|j| j.state == JobStateEnum::Running) {
+            if let Some(assign) = assignments.iter().find(|a| a.job_id == job.id) {
+                if let Some(worker) = workers.iter().find(|w| w.id == assign.worker_id) {
+                    let label = format!("📦 {} → 🛠️ {}", job.job_name, worker.label);
+                    push_line!(
+                        label,
+                        Text::from(format!("{}\n────────────\n{}", worker, job))
+                    );
                     connected_worker_ids.push(worker.id);
-
-                    let combined_text = Text::from(format!("{}\n────────────\n{}", worker, job));
-                    graph_lines.push(Spans::from(Span::raw(format!("   ├─ {}", line))));
-                    elements.push((line, combined_text));
                     continue;
                 }
             }
-
-            graph_lines.push(Spans::from(Span::raw(format!("   ├─ {}", line))));
-            elements.push((line.clone(), Text::from(job_detail)));
+            push_line!(
+                format!("📦 {} (running)", job.job_name),
+                Text::from(format!("{}", job))
+            );
         }
 
-        for worker in workers.iter() {
+        for worker in workers {
             if !connected_worker_ids.contains(&worker.id) {
-                let line = format!("🛠️ {} (idle)", worker.label);
-                graph_lines.push(Spans::from(Span::raw(format!("   └─ {}", line))));
-                elements.push((line.clone(), Text::from(format!("{}", worker))));
+                let label = format!("🛠️ {} (idle)", worker.label);
+                push_line!(label.clone(), Text::from(format!("{}", worker)));
             }
+        }
+
+        graph_lines.push(Spans::from(Span::styled(
+            "[Harvester]",
+            Style::default().fg(Color::Blue),
+        )));
+        index += 1;
+
+        for job in jobs
+            .iter()
+            .filter(|j| matches!(j.state, JobStateEnum::Completed | JobStateEnum::Failed))
+        {
+            let icon = if job.state == JobStateEnum::Completed {
+                "✅"
+            } else {
+                "❌"
+            };
+            push_line!(
+                format!("{} {} (done)", icon, job.job_name),
+                Text::from(format!("{}", job))
+            );
         }
 
         terminal.draw(|f| {
@@ -125,7 +175,7 @@ fn run_app<B: ratatui::backend::Backend>(
                     .iter()
                     .enumerate()
                     .map(|(i, line)| {
-                        if i == selected_index + 5 {
+                        if Some(i) == selectable_indices.get(selected_index).copied() {
                             Spans::from(Span::styled(
                                 line.0.first().unwrap().content.clone(),
                                 Style::default()

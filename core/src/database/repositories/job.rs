@@ -40,14 +40,9 @@ use diesel::dsl::now;
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
-use crate::database::models::job::{
-    Job, NewJob,
-};
+use crate::database::models::job::{Job, NewJob};
 
-use crate::shared::enums::{
-    job::JobStateEnum,
-    schedule::ScheduleTypeEnum,
-};
+use crate::shared::enums::{job::JobStateEnum, schedule::ScheduleTypeEnum};
 
 use crate::database::schema::*;
 use diesel::dsl::count_star;
@@ -183,6 +178,26 @@ impl JobRepository {
         diesel::update(jobs::table.find(id))
             .set((
                 jobs::state.eq(JobStateEnum::Running),
+                jobs::updated_at.eq(now),
+            ))
+            .get_result(c)
+            .await
+    }
+
+    pub async fn mark_submitted(c: &mut AsyncPgConnection, id: i32) -> QueryResult<Job> {
+        diesel::update(jobs::table.find(id))
+            .set((
+                jobs::state.eq(JobStateEnum::Submitted),
+                jobs::updated_at.eq(now),
+            ))
+            .get_result(c)
+            .await
+    }
+
+    pub async fn mark_queued(c: &mut AsyncPgConnection, id: i32) -> QueryResult<Job> {
+        diesel::update(jobs::table.find(id))
+            .set((
+                jobs::state.eq(JobStateEnum::Queued),
                 jobs::updated_at.eq(now),
             ))
             .get_result(c)

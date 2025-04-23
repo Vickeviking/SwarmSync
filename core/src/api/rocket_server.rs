@@ -2,7 +2,7 @@ use crate::api::routes;
 use crate::api::{CacheConn, Cors, DbConn};
 use crate::shared::{enums::system::CoreEvent, SharedResources};
 
-use rocket::{Build, Rocket};
+use rocket::{routes, Build, Rocket};
 use rocket_db_pools::Database;
 use std::env;
 use std::sync::Arc;
@@ -13,6 +13,8 @@ pub async fn build_rocket(shared: Arc<SharedResources>) -> Rocket<Build> {
     let redis_url = env::var("REDIS_URL").expect("REDIS URL must be set");
     // Merge database URL into Rocket's config
     let figment = rocket::Config::figment()
+        .merge(("address", "0.0.0.0"))
+        .merge(("port", 8000))
         .merge(("databases.postgres.url", database_url.clone()))
         .merge(("databases.redis.url", redis_url.clone()));
 
@@ -26,6 +28,7 @@ pub async fn build_rocket(shared: Arc<SharedResources>) -> Rocket<Build> {
         .attach(DbConn::init())
         .manage(shared)
         .mount("/", routes::all_routes())
+        .mount("/", routes![index])
 }
 
 #[rocket::get("/")]

@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 #[derive(AsExpression, Debug, Deserialize, Serialize, FromSqlRow, PartialEq)]
 #[diesel(sql_type = Text)]
 pub enum JobStateEnum {
+    Submitted,
     Queued,
     Running,
     Completed,
@@ -21,6 +22,7 @@ pub enum JobStateEnum {
 impl ToString for JobStateEnum {
     fn to_string(&self) -> String {
         match self {
+            JobStateEnum::Submitted => String::from("Submitted"),
             JobStateEnum::Queued => String::from("Queued"),
             JobStateEnum::Running => String::from("Running"),
             JobStateEnum::Completed => String::from("Completed"),
@@ -34,6 +36,7 @@ impl FromStr for JobStateEnum {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            "Submitted" => Ok(JobStateEnum::Submitted),
             "Queued" => Ok(JobStateEnum::Queued),
             "Running" => Ok(JobStateEnum::Running),
             "Completed" => Ok(JobStateEnum::Completed),
@@ -46,6 +49,7 @@ impl FromStr for JobStateEnum {
 impl FromSql<Text, Pg> for JobStateEnum {
     fn from_sql(value: PgValue<'_>) -> diesel::deserialize::Result<Self> {
         match value.as_bytes() {
+            b"Submitted" => Ok(JobStateEnum::Submitted),
             b"Queued" => Ok(JobStateEnum::Queued),
             b"Running" => Ok(JobStateEnum::Running),
             b"Completed" => Ok(JobStateEnum::Completed),
@@ -61,6 +65,7 @@ impl ToSql<Text, Pg> for JobStateEnum {
         out: &mut diesel::serialize::Output<'b, '_, Pg>,
     ) -> diesel::serialize::Result {
         match self {
+            JobStateEnum::Submitted => out.write_all(b"Submitted")?,
             JobStateEnum::Queued => out.write_all(b"Queued")?,
             JobStateEnum::Running => out.write_all(b"Running")?,
             JobStateEnum::Completed => out.write_all(b"Completed")?,
