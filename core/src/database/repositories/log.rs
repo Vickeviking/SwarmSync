@@ -1,3 +1,4 @@
+//TODO: Routes for log will be removed, not needed logs is done from command_deck
 /*
 ========================
 🛠️ Supported Actions Log
@@ -28,6 +29,7 @@
 
 use crate::database::models::log::{DBLogEntry, NewDBLogEntry};
 use crate::database::schema::logs;
+use crate::shared::enums::log::{LogActionEnum, LogLevelEnum};
 use crate::shared::enums::system::SystemModuleEnum;
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
@@ -86,27 +88,6 @@ impl LogEntryRepository {
             .await
     }
 
-    // Search logs by action
-    pub async fn search_by_action(
-        c: &mut AsyncPgConnection,
-        query: &str,
-    ) -> QueryResult<Vec<DBLogEntry>> {
-        logs::table
-            .filter(logs::action.ilike(format!("%{}%", query)))
-            .load(c)
-            .await
-    }
-
-    pub async fn search_by_level(
-        c: &mut AsyncPgConnection,
-        query: &str,
-    ) -> QueryResult<Vec<DBLogEntry>> {
-        logs::table
-            .filter(logs::level.ilike(format!("%{}%", query)))
-            .load(c)
-            .await
-    }
-
     pub async fn list_all(
         c: &mut AsyncPgConnection,
         limit: i64,
@@ -135,17 +116,48 @@ impl LogEntryRepository {
         Ok(count > 0)
     }
 
-    // Get logs with specific module
+    /// List logs whose `action` equals the given enum variant, with pagination
+    pub async fn list_by_action_exact(
+        c: &mut AsyncPgConnection,
+        action: LogActionEnum,
+        limit: i64,
+        offset: i64,
+    ) -> QueryResult<Vec<DBLogEntry>> {
+        logs::table
+            .filter(logs::action.eq(action))
+            .limit(limit)
+            .offset(offset)
+            .load(c)
+            .await
+    }
+
+    /// List logs whose `level` equals the given enum variant, with pagination
+    pub async fn list_by_level_exact(
+        c: &mut AsyncPgConnection,
+        level: LogLevelEnum,
+        limit: i64,
+        offset: i64,
+    ) -> QueryResult<Vec<DBLogEntry>> {
+        logs::table
+            .filter(logs::level.eq(level))
+            .limit(limit)
+            .offset(offset)
+            .load(c)
+            .await
+    }
+
+    /// List logs for a specific module, with pagination
     pub async fn find_logs_by_module(
         c: &mut AsyncPgConnection,
         module: SystemModuleEnum,
+        limit: i64,
+        offset: i64,
     ) -> QueryResult<Vec<DBLogEntry>> {
         logs::table
             .filter(logs::module.eq(module))
+            .limit(limit)
+            .offset(offset)
             .load(c)
             .await
-            .map(|db_logs: Vec<DBLogEntry>| {
-                db_logs.into_iter().map(|db_log| db_log.into()).collect()
-            })
     }
 }

@@ -1,14 +1,17 @@
 use crate::api::auth;
 use crate::database::models::job::{Job, JobAssignment, NewJob, NewJobAssignment};
+use crate::database::models::log::{DBLogEntry, NewDBLogEntry};
 use crate::database::models::user::{NewUser, User};
 use crate::database::models::worker::{NewWorker, Worker};
 use crate::database::repositories::{
-    JobAssignmentRepository, JobRepository, UserRepository, WorkerRepository,
+    JobAssignmentRepository, JobRepository, LogEntryRepository, UserRepository, WorkerRepository,
 };
 use crate::shared::enums::image_format::ImageFormatEnum;
 use crate::shared::enums::job::JobStateEnum;
+use crate::shared::enums::log::{LogActionEnum, LogLevelEnum};
 use crate::shared::enums::output::OutputTypeEnum;
 use crate::shared::enums::schedule::ScheduleTypeEnum;
+use crate::shared::enums::system::SystemModuleEnum;
 use crate::shared::enums::workers::OSEnum;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use diesel_async::{AsyncConnection, AsyncPgConnection};
@@ -323,5 +326,109 @@ pub async fn list_assignments_filtered(user_id: i32, job_id: Option<i32>, worker
                 a.job_id, a.worker_id, a.assigned_at
             );
         }
+    }
+}
+
+// ======== LOGS =========
+/// Create a new log entry
+pub async fn create_log_entry(
+    level: LogLevelEnum,
+    module: SystemModuleEnum,
+    action: LogActionEnum,
+    expires_at: NaiveDateTime,
+    client_ip: Option<String>,
+    client_username: Option<String>,
+    custom_msg: Option<String>,
+) {
+    let mut conn = load_db_connection().await;
+    let new_entry = NewDBLogEntry {
+        level,
+        module,
+        action,
+        expires_at,
+        client_connected_ip: client_ip,
+        client_connected_username: client_username,
+        job_submitted_job_id: None,
+        job_submitted_from_module: None,
+        job_submitted_to_module: None,
+        job_completed_job_id: None,
+        job_completed_success: None,
+        custom_msg,
+    };
+
+    match LogEntryRepository::create(&mut conn, new_entry).await {
+        Ok(log) => println!("✅ Created log entry with ID {}", log.id),
+        Err(e) => eprintln!("❌ Failed to create log entry: {}", e),
+    }
+}
+
+/// Fetch a log entry by its ID
+pub async fn get_log_by_id(id: i32) {
+    let mut conn = load_db_connection().await;
+    match LogEntryRepository::find_by_id(&mut conn, id).await {
+        Ok(log) => println!("📄 Log {}: {:?}", id, log),
+        Err(e) => eprintln!("❌ Error fetching log {}: {}", id, e),
+    }
+}
+
+/// Returns the log entry or an error.
+pub async fn fetch_log_entry(id: i32) -> Result<DBLogEntry, anyhow::Error> {
+    let mut conn = load_db_connection().await;
+    let entry = LogEntryRepository::find_by_id(&mut conn, id).await?;
+    Ok(entry)
+}
+
+/// Fetch a page of *all* logs
+pub async fn fetch_logs(limit: i64, offset: i64) -> Result<Vec<DBLogEntry>, anyhow::Error> {
+    let mut conn = load_db_connection().await;
+    Ok(LogEntryRepository::list_all(&mut conn, limit, offset).await?)
+}
+
+/// Fetch a page of logs matching exactly `action`
+pub async fn fetch_logs_by_action(
+    action: LogActionEnum,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<DBLogEntry>, anyhow::Error> {
+    let mut conn = load_db_connection().await;
+    Ok(LogEntryRepository::list_by_action_exact(&mut conn, action, limit, offset).await?)
+}
+
+/// Fetch a page of logs matching exactly `level`
+pub async fn fetch_logs_by_level(
+    level: LogLevelEnum,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<DBLogEntry>, anyhow::Error> {
+    let mut conn = load_db_connection().await;
+    Ok(LogEntryRepository::list_by_level_exact(&mut conn, level, limit, offset).await?)
+}
+
+/// Fetch a page of logs in `module`
+pub async fn fetch_logs_by_module(
+    module: SystemModuleEnum,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<DBLogEntry>, anyhow::Error> {
+    let mut conn = load_db_connection().await;
+    Ok(LogEntryRepository::find_logs_by_module(&mut conn, module, limit, offset).await?)
+}
+
+/// Update an existing log entry
+pub async fn update_log_entry(id: i32, updated: DBLogEntry) {
+    let mut conn = load_db_connection().await;
+    match LogEntryRepository::update(&mut conn, id, updated).await {
+        Ok(log) => println!("✏️ Updated log {}: {:?}", id, log),
+        Err(e) => eprintln!("❌ Failed to update log {}: {}", id, e),
+    }
+}
+
+/// Delete a log entry by ID
+pub async fn delete_log_entry(id: i32) {
+    let mut conn = load_db_connection().await;
+    match LogEntryRepository::delete(&mut conn, id).await {
+        Ok(n) if n > 0 => println!("🗑️ Deleted log entry {}", id),
+        Ok(_) => println!("⚠️ No log found with ID {}", id),
+        Err(e) => eprintln!("❌ Error deleting log {}: {}", id, e),
     }
 }

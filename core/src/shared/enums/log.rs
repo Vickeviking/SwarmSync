@@ -1,13 +1,15 @@
+use core::fmt;
 use diesel::deserialize::{FromSql, FromSqlRow};
 use diesel::expression::AsExpression;
 use diesel::pg::{Pg, PgValue};
 use diesel::serialize::ToSql;
 use diesel::sql_types::Text;
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 use std::io::Write;
 use std::str::FromStr;
 
-#[derive(AsExpression, Debug, Deserialize, Serialize, FromSqlRow)]
+#[derive(AsExpression, Debug, Deserialize, Serialize, FromSqlRow, Clone)]
 #[diesel(sql_type = diesel::sql_types::VarChar)]
 pub enum LogLevelEnum {
     Info,    //Expire in 5 minutes
@@ -17,30 +19,35 @@ pub enum LogLevelEnum {
     Fatal,
 }
 
-impl ToString for LogLevelEnum {
-    fn to_string(&self) -> String {
-        match self {
-            LogLevelEnum::Info => String::from("Info"),
-            LogLevelEnum::Success => String::from("Success"),
-            LogLevelEnum::Warning => String::from("Warning"),
-            LogLevelEnum::Error => String::from("Error"),
-            LogLevelEnum::Fatal => String::from("Fatal"),
+impl LogLevelEnum {
+    pub fn variants() -> &'static [&'static str] {
+        &["Info", "Success", "Warning", "Error", "Fatal"]
+    }
+}
+
+impl From<usize> for LogLevelEnum {
+    fn from(idx: usize) -> Self {
+        match idx {
+            0 => LogLevelEnum::Info,
+            1 => LogLevelEnum::Success,
+            2 => LogLevelEnum::Warning,
+            3 => LogLevelEnum::Error,
+            4 => LogLevelEnum::Fatal,
+            _ => panic!("invalid LogLevelEnum variant index"),
         }
     }
 }
 
-impl FromStr for LogLevelEnum {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "Info" => Ok(LogLevelEnum::Info),
-            "Success" => Ok(LogLevelEnum::Success),
-            "Warning" => Ok(LogLevelEnum::Warning),
-            "Error" => Ok(LogLevelEnum::Error),
-            "Fatal" => Ok(LogLevelEnum::Fatal),
-            _ => Err(()),
-        }
+impl fmt::Display for LogLevelEnum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            LogLevelEnum::Info => "Info",
+            LogLevelEnum::Success => "Success",
+            LogLevelEnum::Warning => "Warning",
+            LogLevelEnum::Error => "Error",
+            LogLevelEnum::Fatal => "Fatal",
+        };
+        write!(f, "{}", s)
     }
 }
 
@@ -73,7 +80,7 @@ impl ToSql<Text, Pg> for LogLevelEnum {
     }
 }
 
-#[derive(AsExpression, Debug, Deserialize, Serialize, FromSqlRow)]
+#[derive(AsExpression, Debug, Deserialize, Serialize, FromSqlRow, Clone)]
 #[diesel(sql_type = diesel::sql_types::VarChar)]
 pub enum LogActionEnum {
     ClientConnected,
@@ -84,16 +91,44 @@ pub enum LogActionEnum {
     Custom,
 }
 
-impl ToString for LogActionEnum {
-    fn to_string(&self) -> String {
-        match self {
-            LogActionEnum::ClientConnected => String::from("ClientConnected"),
-            LogActionEnum::JobSubmitted => String::from("JobSubmitted"),
-            LogActionEnum::JobCompleted => String::from("JobCompleted"),
-            LogActionEnum::SystemStarted => String::from("SystemStarted"),
-            LogActionEnum::SystemShutdown => String::from("SystemShutdown"),
-            LogActionEnum::Custom => String::from("Custom"),
+impl LogActionEnum {
+    pub fn variants() -> &'static [&'static str] {
+        &[
+            "ClientConnected",
+            "JobSubmitted",
+            "JobCompleted",
+            "SystemStarted",
+            "SystemShutdown",
+            "Custom",
+        ]
+    }
+}
+
+impl From<usize> for LogActionEnum {
+    fn from(idx: usize) -> Self {
+        match idx {
+            0 => LogActionEnum::ClientConnected,
+            1 => LogActionEnum::JobSubmitted,
+            2 => LogActionEnum::JobCompleted,
+            3 => LogActionEnum::SystemStarted,
+            4 => LogActionEnum::SystemShutdown,
+            5 => LogActionEnum::Custom,
+            _ => panic!("invalid LogActionEnum variant index"),
         }
+    }
+}
+
+impl fmt::Display for LogActionEnum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            LogActionEnum::ClientConnected => "ClientConnected",
+            LogActionEnum::JobSubmitted => "JobSubmitted",
+            LogActionEnum::JobCompleted => "JobCompleted",
+            LogActionEnum::SystemStarted => "SystemStarted",
+            LogActionEnum::SystemShutdown => "SystemShutdown",
+            LogActionEnum::Custom => "Custom",
+        };
+        write!(f, "{}", s)
     }
 }
 

@@ -1,3 +1,4 @@
+use core::fmt;
 use diesel::deserialize::{FromSql, FromSqlRow};
 use diesel::expression::AsExpression;
 use diesel::pg::{Pg, PgValue};
@@ -78,16 +79,44 @@ pub enum SystemModuleEnum {
     TaskArchive,
 }
 
-impl ToString for SystemModuleEnum {
-    fn to_string(&self) -> String {
-        match self {
-            SystemModuleEnum::Dispatcher => "Dispatcher".to_string(),
-            SystemModuleEnum::Harvester => "Harvester".to_string(),
-            SystemModuleEnum::Hibernator => "Hibernator".to_string(),
-            SystemModuleEnum::Receiver => "Receiver".to_string(),
-            SystemModuleEnum::Scheduler => "Scheduler".to_string(),
-            SystemModuleEnum::TaskArchive => "TaskArchive".to_string(),
+impl SystemModuleEnum {
+    pub fn variants() -> &'static [&'static str] {
+        &[
+            "Dispatcher",
+            "Harvester",
+            "Hibernator",
+            "Receiver",
+            "Scheduler",
+            "TaskArchive",
+        ]
+    }
+}
+
+impl From<usize> for SystemModuleEnum {
+    fn from(idx: usize) -> Self {
+        match idx {
+            0 => SystemModuleEnum::Dispatcher,
+            1 => SystemModuleEnum::Harvester,
+            2 => SystemModuleEnum::Hibernator,
+            3 => SystemModuleEnum::Receiver,
+            4 => SystemModuleEnum::Scheduler,
+            5 => SystemModuleEnum::TaskArchive,
+            _ => panic!("invalid SystemModuleEnum variant index"),
         }
+    }
+}
+
+impl fmt::Display for SystemModuleEnum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            SystemModuleEnum::Dispatcher => "Dispatcher",
+            SystemModuleEnum::Harvester => "Harvester",
+            SystemModuleEnum::Hibernator => "Hibernator",
+            SystemModuleEnum::Receiver => "Receiver",
+            SystemModuleEnum::Scheduler => "Scheduler",
+            SystemModuleEnum::TaskArchive => "TaskArchive",
+        };
+        write!(f, "{}", s)
     }
 }
 
