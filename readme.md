@@ -1,11 +1,11 @@
 # 🐝 SwarmSync
 
 > **Distributed container orchestration made portable.**  
-> Schedule, run, and manage containerized jobs at scale — all with modular services and a plug-and-play AdminPanel.
+> Schedule, run, and manage containerized jobs at scale — now with a unified Rust CLI and TUI inspection tools.
 
-![Version](https://img.shields.io/badge/version-v0.3.0-blue.svg)  
+![Version](https://img.shields.io/badge/version-v0.4.0-blue.svg)  
 ![Rust](https://img.shields.io/badge/Rust-safe--async--engine-orange.svg)  
-![Vue](https://img.shields.io/badge/AdminPanel-Vue3%20+%20Vite-green.svg)  
+![CLI](https://img.shields.io/badge/Client-CLI%20(consumer)-brightgreen.svg)  
 ![Docker](https://img.shields.io/badge/Containerized-yes-blue.svg)
 
 ---
@@ -16,8 +16,9 @@
 - [🧠 Core Architecture](#-core-architecture)
 - [⚙️ Core Engine Runtime](#-core-engine-runtime)
 - [🌐 Rocket API & Auth](#-rocket-api--authentication)
-- [🖥 AdminPanel](#-adminpanel-client-interface)
-- [📦 Job Upload Workflow](#-consumer-workflow-via-adminpanel)
+- [🖥 Consumer CLI](#-consumer-cli)
+- [🔍 Inspection Tools](#-inspection-tools)
+- [📦 Job & Worker CRUD](#-job--worker--log-crud)
 - [⏱️ Scheduled Jobs: Hibernator](#-scheduled-execution-with-hibernator)
 - [🧱 Worker Nodes](#-worker-nodes)
 - [🔐 Security Model](#-security--flexibility)
@@ -28,166 +29,186 @@
 
 ## 🚀 SwarmSync Overview
 
-**SwarmSync** is a modular, high-performance distributed system for orchestrating containerized workloads across local or remote clusters. It offers:
+**SwarmSync** is a modular, high-performance distributed system for orchestrating containerized workloads across clusters. It now provides:
 
-- 🧠 **Async task orchestration** in Rust
+- 🧠 **Async orchestration** in Rust
 - 🔁 **Intelligent queuing & scheduling**
-- 🔐 **Token-based authentication**
-- 🖥️ **Web-based AdminPanel** for live control
-- 🐳 **Docker-native job execution**
-- 🔄 **Delayed & recurring tasks** via persistent schedules
+- 🎛 **Rust CLI (`consumer`)** for job submission & retrieval
+- 🔍 **TUI inspectors** for Jobs and Core modules
+- 🐳 **Docker-native execution** and persistence via PostgreSQL + Redis
 
-Built for observability, extensibility, and collaboration.
+## 🛠 Built With
+
+- **Rust** + Tokio for high-performance async  
+- **Rocket** for HTTP API  
+- **Diesel** ORM + **PostgreSQL** for persistent state  
+- **Redis** for ephemeral sessions & queue metadata  
+- **Argon2** for secure password hashing  
+- **Docker** & **Docker Compose** for containerization  
+- **tui** + **crossterm** for terminal UIs  
+- **chrono** for date/time handling  
+- **anyhow** for ergonomic error handling  
+- **dialoguer** for interactive CLI prompts  
+
+Built for observability, extensibility, and ease of use.
 
 ---
 
 ## 🧠 Core Architecture
 
-The [**Core**](https://www.notion.so/Core-1d014b38fe39801abf0afd74f96d4f35?pvs=21) is the heart of SwarmSync. It is composed of:
+The **Core** backend ties everything together:
 
-- 🚀 `Rocket` HTTP API for external interaction
-- 🧠 Internal async engine for orchestration logic
-- 🧩 Redis for ephemeral state (sessions, tokens)
-- 🗃 PostgreSQL + Diesel ORM for persistence
+- 🚀 `Rocket` HTTP API for integration
+- 🧠 Internal async engine built on `tokio`
+- 🗃 PostgreSQL (persistent job & log store)
+- 🔄 Redis (ephemeral sessions, queue metadata)
 
-Core runs fully containerized (via Docker Compose) and is deployable on any Docker-compatible host.
+Runs fully containerized via Docker Compose, deployable on any Docker host.
 
 ---
 
 ## ⚙️ Core Engine Runtime
 
-The engine is written in Rust using `tokio`. Key systems:
+Rust + `tokio` powers a set of decoupled services:
 
-- **`service_channels`** – Async broadcast/messaging backbone
-- **`service_handles`** – Lifecycle tracking of tasks & services
-- **`shared_resource`** – Global `Arc<Mutex<>>` state sharing
-- **`pulse_system`** – Central heartbeat/timing pulse (fast/med/slow)
+- **`service_channels`** – broadcast/messaging backbone
+- **`service_handles`** – lifecycle management of tasks
+- **`shared_resource`** – shared `Arc<Mutex<>>` state
+- **`pulse_system`** – centralized heartbeat (fast/med/slow)
 
-Internal modules like `Scheduler`, `Dispatcher`, `Hibernator`, `Harvester`, and `Logger` are all decoupled services coordinated through these systems.
+Modules like `Scheduler`, `Dispatcher`, `Hibernator`, `Harvester`, and `Logger` run concurrently, coordinating via these primitives.
 
 ---
 
 ## 🌐 Rocket API & Authentication
 
-The `Rocket`-based HTTP API provides:
+The `Rocket` HTTP API offers:
 
-- Job submission, scheduling, result fetching
-- Admin login and session issuance
-- Live system and queue status
+- Job submission, state transitions, result retrieval
+- Worker registration and heartbeats
+- Log querying and stats
 
 **Auth**:
 
-- Redis-based session tokens for ephemeral auth
-- PostgreSQL for user records, roles, and metadata
-- Public key challenge/response (planned)
+- Token-based sessions in Redis
+- User records in PostgreSQL
+- Planned PKI challenge/response for CLI
 
 ---
 
-## 🖥 AdminPanel (Client Interface)
+## 🖥 Consumer CLI
 
-The AdminPanel is a standalone Vue 3 + Vite web app with Vuetify. It provides:
+The **`consumer`** is a Rust-powered CLI (no front-end framework) that runs in the Core container or standalone. It supports:
 
-- 🧠 Real-time dashboard: Core health, worker telemetry
-- 📦 Job uploads: Docker metadata, compose setups
-- 🔄 Result tracking: Pull archived output as `.txt`
-- 🔐 Token-based login with persistent sessions (planned)
-- ⚙️ Config via browser storage or optional JSON
+- **Job CRUD**: create, list, update, delete
+- **Worker CRUD**: register, list, update, delete
+- **Log CRUD**: record, query, paginate, update, delete
+- **Inspect**: TUI for browsing Jobs or Core modules/logs
 
-Not containerized — launch with `npm run dev` and access via browser at `http://localhost:5173`.
+Launch it by:
+
+```bash
+# inside the core container
+consumer main-menu
+```
+
+Or containerized:
+
+```bash
+docker run --rm -it swarmcore/consumer:latest consumer main-menu
+```
 
 ---
 
-## 📦 Consumer Workflow (via AdminPanel)
+## 🔍 Inspection Tools
 
-1. 🛠 Admin sets up a Core instance on a remote or local node.
-2. 🔐 Logs into Core via AdminPanel.
-3. 📤 Uploads job metadata (Docker image URL, flags, etc).
-4. 🧪 Core schedules and dispatches job to available Workers.
-5. 📥 Admin monitors job and downloads results from Archive.
+Two TUI inspectors are available:
 
-No shared LAN or complex network setup required — only public Core access.
+- **JobInspect**: visualize job / worker / assignment state in a live TUI graph
+- **CoreInspect**: browse Core modules, see purpose & recent logs
+
+Both launch from the `consumer` menu under “Inspect.”
+
+---
+
+## 📦 Job & Worker CRUD
+
+Through the `consumer` CLI you can:
+
+- Submit new Docker‐based jobs
+- List and filter by user, state, schedule
+- Assign jobs to workers, track status
+- Register and manage worker nodes
+- Query and paginate system logs
+
+Fully scriptable and automatable via shell.
 
 ---
 
 ## ⏱️ Scheduled Execution with Hibernator
 
-The `Hibernator` module handles:
+The **`Hibernator`** module handles:
 
-- ⏰ **Delayed jobs** — run at a set time
-- 🔁 **Recurring jobs** — e.g., daily, weekly
-- 💾 Stored in PostgreSQL for persistence
+- ⏰ **Delayed jobs** — run at specific times
+- 🔁 **Recurring jobs** — cron‐style schedules
 
-Admins define schedules via AdminPanel. Triggers are handled by internal time-pulse logic with full control.
+Schedules are stored in PostgreSQL and triggered by a persistent time-pulse.
 
 ---
 
 ## 🧱 Worker Nodes
 
-Workers are platform-agnostic executors:
+Workers are stateless executors:
 
-- 🐳 Docker containers that poll Core for jobs
-- 🌍 Run locally or remotely
-- ⬇️ Fetch public Docker images directly
-- 🧪 Execute isolated containers
-- 📤 Return output to Core
-
-Lightweight and stateless by design — any machine that supports Docker can become a Worker.
+- 🐳 Pull & run Docker images
+- 🌍 Poll Core for assignments
+- 📥 Return output & logs to Core
+- 🚀 Scale horizontally on any Docker host
 
 ---
 
 ## 🔐 Security & Flexibility
 
-- ✅ Token-based auth via Redis
-- 🔏 SHA checksums for verifying job payloads
-- 👥 Multi-admin support with PostgreSQL roles
+- ✅ Redis‐backed token auth
+- 🔏 SHA checksums for payload integrity
+- 👥 Multi‐user isolation via DB roles
 - 🌍 Public or private Core deployments
-- 📡 AdminPanel is stateless and browser-based
+- 🖥 CLI is stateless and containerized
 
 ---
 
 ## 🧭 Summary
 
-SwarmSync delivers a modular, async-first system for distributed container execution. With its decoupled design, AdminPanel-based UX, and Docker-native pipeline, it enables scalable workload orchestration in everything from dev environments to production-grade multi-node clusters.
+SwarmSync offers a full end‑to‑end Rust stack:
+
+1. **Core** orchestrates jobs and persistence
+2. **Consumer CLI** submits and retrieves work
+3. **TUI Inspectors** surface live state and logs
+
+Everything is containerized for easy deployment and scaling.
 
 ---
 
 ## 🧪 Running SwarmSync (Local Dev)
 
-To test SwarmSync locally during development, follow these steps:
-
-### 1. Start the Core container
-
-Spin up the Core backend using Docker Compose:
+### 1. Start Core & DB
 
 ```bash
 docker compose up core
 ```
 
-This launches:
-
-- 🧠 Core (Rust backend)
-- 🗃 PostgreSQL (persistent job DB)
-- 🔄 Redis (ephemeral token/session store)
-  The Core API becomes available at http://localhost:8000 once Rocket is fully booted.
-
----
-
-### 2. Launch the AdminPanel
-
-Navigate into the frontend directory and start the local dev server:
+### 2. Enter `consumer` CLI
 
 ```bash
-cd adminpanel
-npm install         # First time only
-npm run dev
+# In container or local CLI install
+docker exec -it core-app consumer main-menu
 ```
 
----
+### 3. Explore!
 
-### 3. Connect AdminPanel to Core
+- Submit jobs, register workers, view logs
+- Launch inspectors from `consumer` → Inspect
+- No additional front-end setup required
 
-If Core is on a remote host:
+Happy orchestrating! 🎉
 
-Go to Settings → Core Address
-Enter your Core’s URL (e.g., http://192.168.1.42:8000)
-Save and reconnect
