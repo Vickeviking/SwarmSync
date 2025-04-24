@@ -1,4 +1,4 @@
-use crate::commands;
+use crate::{cli::utils::select_user, commands};
 use dialoguer::{theme::ColorfulTheme, Input, Select};
 
 pub async fn menu() -> anyhow::Result<()> {
@@ -72,9 +72,7 @@ async fn create_user() -> anyhow::Result<()> {
 }
 
 async fn update_user() -> anyhow::Result<()> {
-    let id: i32 = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("User ID")
-        .interact_text()?;
+    let id: i32 = select_user().await.unwrap();
     let username: String = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("New Username")
         .interact_text()?;
@@ -90,9 +88,7 @@ async fn update_user() -> anyhow::Result<()> {
 }
 
 async fn delete_user() -> anyhow::Result<()> {
-    let id: i32 = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("User ID")
-        .interact_text()?;
+    let id: i32 = select_user().await.unwrap();
 
     commands::delete_user(id).await;
     Ok(())

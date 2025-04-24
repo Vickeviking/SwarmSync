@@ -58,10 +58,18 @@ impl JobRepository {
 
     pub async fn create(c: &mut AsyncPgConnection, new_job: NewJob) -> QueryResult<Job> {
         dbg!(&new_job.state);
-        diesel::insert_into(jobs::table)
+
+        match diesel::insert_into(jobs::table)
             .values(new_job)
-            .get_result(c)
+            .get_result::<Job>(c)
             .await
+        {
+            Ok(job) => {
+                let _ = Self::mark_submitted(c, job.id).await;
+                Ok(job)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     pub async fn update(c: &mut AsyncPgConnection, id: i32, job: Job) -> QueryResult<Job> {
