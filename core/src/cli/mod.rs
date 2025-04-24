@@ -1,4 +1,3 @@
-pub mod graph_tui;
 pub mod menu;
 pub mod utils;
 pub mod views;

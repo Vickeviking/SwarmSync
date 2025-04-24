@@ -1,4 +1,4 @@
-use crate::cli::views::{graph, jobs, logs, users};
+use crate::cli::views::{core_inspect, job_inspect, jobs, logs, users};
 use dialoguer::{theme::ColorfulTheme, Select};
 
 pub async fn main_menu() -> anyhow::Result<()> {
@@ -9,6 +9,7 @@ pub async fn main_menu() -> anyhow::Result<()> {
             "Manage Jobs & Workers",
             "Manage Logs",
             "JobInspect",
+            "CoreInspect",
         ];
 
         let choice = Select::with_theme(&ColorfulTheme::default())
@@ -22,7 +23,8 @@ pub async fn main_menu() -> anyhow::Result<()> {
             1 => users::menu().await?,
             2 => jobs::user_perspective_menu().await?,
             3 => logs::menu().await?,
-            4 => graph::visualize().await?,
+            4 => job_inspect::inspect().await?,
+            5 => core_inspect::inspect().await?,
             _ => unreachable!(),
         }
     }
