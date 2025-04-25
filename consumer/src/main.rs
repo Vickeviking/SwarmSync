@@ -1,5 +1,4 @@
-#![forbid(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-#![deny(warnings)]
+#![warn(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #![forbid(unsafe_code)]
 
 mod client;

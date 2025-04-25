@@ -5,7 +5,7 @@
 
 ![Version](https://img.shields.io/badge/version-v0.4.0-blue.svg)  
 ![Rust](https://img.shields.io/badge/Rust-safe--async--engine-orange.svg)  
-![CLI](https://img.shields.io/badge/Client-CLI%20(consumer)-brightgreen.svg)  
+![CLI](<https://img.shields.io/badge/Client-CLI%20(consumer)-brightgreen.svg>)  
 ![Docker](https://img.shields.io/badge/Containerized-yes-blue.svg)
 
 ---
@@ -39,16 +39,16 @@
 
 ## 🛠 Built With
 
-- **Rust** + Tokio for high-performance async  
-- **Rocket** for HTTP API  
-- **Diesel** ORM + **PostgreSQL** for persistent state  
-- **Redis** for ephemeral sessions & queue metadata  
-- **Argon2** for secure password hashing  
-- **Docker** & **Docker Compose** for containerization  
-- **tui** + **crossterm** for terminal UIs  
-- **chrono** for date/time handling  
-- **anyhow** for ergonomic error handling  
-- **dialoguer** for interactive CLI prompts  
+- **Rust** + Tokio for high-performance async
+- **Rocket** for HTTP API
+- **Diesel** ORM + **PostgreSQL** for persistent state
+- **Redis** for ephemeral sessions & queue metadata
+- **Argon2** for secure password hashing
+- **Docker** & **Docker Compose** for containerization
+- **tui** + **crossterm** for terminal UIs
+- **chrono** for date/time handling
+- **anyhow** for ergonomic error handling
+- **dialoguer** for interactive CLI prompts
 
 Built for observability, extensibility, and ease of use.
 
@@ -96,31 +96,16 @@ The `Rocket` HTTP API offers:
 
 ---
 
-## 🖥 Consumer CLI
+## 🖥 CommandDeck
 
-The **`consumer`** is a Rust-powered CLI (no front-end framework) that runs in the Core container or standalone. It supports:
+The **`commanddeck`** is a Rust-powered CLI (no front-end framework) that runs in the Core container or standalone. It supports:
 
 - **Job CRUD**: create, list, update, delete
 - **Worker CRUD**: register, list, update, delete
 - **Log CRUD**: record, query, paginate, update, delete
 - **Inspect**: TUI for browsing Jobs or Core modules/logs
 
-Launch it by:
-
-```bash
-# inside the core container
-consumer main-menu
-```
-
-Or containerized:
-
-```bash
-docker run --rm -it swarmcore/consumer:latest consumer main-menu
-```
-
----
-
-## 🔍 Inspection Tools
+### 🔍 Inspection Tools
 
 Two TUI inspectors are available:
 
@@ -129,9 +114,7 @@ Two TUI inspectors are available:
 
 Both launch from the `consumer` menu under “Inspect.”
 
----
-
-## 📦 Job & Worker CRUD
+### 📦 Job & Worker CRUD
 
 Through the `consumer` CLI you can:
 
@@ -177,38 +160,59 @@ Workers are stateless executors:
 
 ---
 
-## 🧭 Summary
+## Consumer
 
-SwarmSync offers a full end‑to‑end Rust stack:
+A a Rust-powered CLI (no front-end framework), used for users to log in on a local
+or remote device to interact with the core. supports
 
-1. **Core** orchestrates jobs and persistence
-2. **Consumer CLI** submits and retrieves work
-3. **TUI Inspectors** surface live state and logs
-
-Everything is containerized for easy deployment and scaling.
+- Job submission
+- Job inspection
+- Finnished job retrieval
 
 ---
 
-## 🧪 Running SwarmSync (Local Dev)
+## 🧪 Local Dev Quickstart
 
-### 1. Start Core & DB
+Get everything up and running in two stages: Core → Consumer.
 
-```bash
-docker compose up core
-```
+1. Spin up the Core
 
-### 2. Enter `consumer` CLI
+# Move into the core service
 
-```bash
-# In container or local CLI install
-docker exec -it core-app consumer main-menu
-```
+cd core
 
-### 3. Explore!
+# 1.1 Start containers (Postgres, Redis, Core)
 
-- Submit jobs, register workers, view logs
-- Launch inspectors from `consumer` → Inspect
-- No additional front-end setup required
+docker compose up -d
 
-Happy orchestrating! 🎉
+# 1.2 Run database migrations
 
+docker compose exec app diesel migration run
+
+# 1.3 Launch the CoreNode API
+
+docker compose exec app cargo run --bin core
+
+# 1.4 (Optional) Launch the CommandDeck CLI
+
+docker compose exec app cargo run --bin commanddeck
+
+# 1.5 Run Core tests
+
+docker compose exec app cargo test 2. Launch the Consumer CLI
+
+# Move into the consumer service
+
+cd ../consumer
+
+# 2.1 Start a long-running consumer container
+
+docker compose up -d consumer
+
+# 2.2 Execute your interactive CLI
+
+docker compose exec consumer cargo run
+
+# 2.3 Run Consumer tests
+
+docker compose exec consumer cargo test

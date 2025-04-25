@@ -3,7 +3,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ["./consumer"]
+      target: builder # use your builder stage so Rust toolchain is present
+    volumes:
+      - .:/usr/src/consumer # mount your source in
+    working_dir: /usr/src/consumer
+    entrypoint: ["tail", "-f", "/dev/null"] # keep the container alive
 
   consumer-test:
     build:
