@@ -3,216 +3,112 @@
 > **Distributed container orchestration made portable.**  
 > Schedule, run, and manage containerized jobs at scale — now with a unified Rust CLI and TUI inspection tools.
 
-![Version](https://img.shields.io/badge/version-v0.4.0-blue.svg)  
-![Rust](https://img.shields.io/badge/Rust-safe--async--engine-orange.svg)  
-![CLI](<https://img.shields.io/badge/Client-CLI%20(consumer)-brightgreen.svg>)  
-![Docker](https://img.shields.io/badge/Containerized-yes-blue.svg)
+[![Version](https://img.shields.io/badge/version-v0.4.0-blue.svg)]()
+[![Rust](https://img.shields.io/badge/Rust-safe--async--engine-orange.svg)]()
+[![CLI](<https://img.shields.io/badge/Client-CLI%20(consumer)-brightgreen.svg>)]()
+[![Docker](https://img.shields.io/badge/Containerized-yes-blue.svg)]()
 
 ---
 
-## 📖 Table of Contents
+## 🏁 Purpose
 
-- [🚀 Overview](#-swarmsync-overview)
-- [🧠 Core Architecture](#-core-architecture)
-- [⚙️ Core Engine Runtime](#-core-engine-runtime)
-- [🌐 Rocket API & Auth](#-rocket-api--authentication)
-- [🖥 Consumer CLI](#-consumer-cli)
-- [🔍 Inspection Tools](#-inspection-tools)
-- [📦 Job & Worker CRUD](#-job--worker--log-crud)
-- [⏱️ Scheduled Jobs: Hibernator](#-scheduled-execution-with-hibernator)
-- [🧱 Worker Nodes](#-worker-nodes)
-- [🔐 Security Model](#-security--flexibility)
-- [🧭 Summary](#-summary)
-- [🧪 Running SwarmSync (Local Dev)](#-running-swarmsync-local-dev)
+SwarmSync provides a lightweight, extensible platform for scheduling and orchestrating Docker-based workloads. It aims to deliver:
+
+- **Portable deployment** via Docker Compose
+- **High-performance** async runtime in Rust
+- **Unified interfaces**: HTTP API, CLI, and TUI
+- **Robust scheduling**: immediate, delayed, and recurring jobs
 
 ---
 
-## 🚀 SwarmSync Overview
+## 🏗️ Architecture & Components
 
-**SwarmSync** is a modular, high-performance distributed system for orchestrating containerized workloads across clusters. It now provides:
+SwarmSync consists of three primary components. Detailed design docs live under `docs/`.
 
-- 🧠 **Async orchestration** in Rust
-- 🔁 **Intelligent queuing & scheduling**
-- 🎛 **Rust CLI (`consumer`)** for job submission & retrieval
-- 🔍 **TUI inspectors** for Jobs and Core modules
-- 🐳 **Docker-native execution** and persistence via PostgreSQL + Redis
+### 1. Core Module
 
-## 🛠 Built With
+A containerized Rust service binding together HTTP, engine, and CLI glue.
 
-- **Rust** + Tokio for high-performance async
-- **Rocket** for HTTP API
-- **Diesel** ORM + **PostgreSQL** for persistent state
-- **Redis** for ephemeral sessions & queue metadata
-- **Argon2** for secure password hashing
-- **Docker** & **Docker Compose** for containerization
-- **tui** + **crossterm** for terminal UIs
-- **chrono** for date/time handling
-- **anyhow** for ergonomic error handling
-- **dialoguer** for interactive CLI prompts
+- **Rocket Server**: exposes REST endpoints for job and worker management
+- **Core Engine**: async scheduler, dispatcher, and heartbeat systems
+- **CommandDeck**: built-in CLI for administrative tasks and TUI inspection
 
-Built for observability, extensibility, and ease of use.
+_See [`docs/overview.md`](docs/overview.md#core-module) for details._
 
----
+### 2. Consumer CLI
 
-## 🧠 Core Architecture
+A standalone Rust-based CLI for end users to submit, query, and manage jobs.
 
-The **Core** backend ties everything together:
+- Job submission and status retrieval
+- Interactive prompts (Argon2‑secured credentials)
+- TUI inspectors for live feedback
 
-- 🚀 `Rocket` HTTP API for integration
-- 🧠 Internal async engine built on `tokio`
-- 🗃 PostgreSQL (persistent job & log store)
-- 🔄 Redis (ephemeral sessions, queue metadata)
+_See [`docs/overview.md`](docs/overview.md#consumer-cli) for details._
 
-Runs fully containerized via Docker Compose, deployable on any Docker host.
+### 3. Worker Nodes
+
+Stateless executors that poll Core for assignments and run container workloads.
+
+- Docker image pull & execution
+- Heartbeat, log streaming, and result upload
+- Horizontal scaling on any Docker host
+
+_See [`docs/overview.md`](docs/overview.md#worker-nodes) for details._
 
 ---
 
-## ⚙️ Core Engine Runtime
+## 📂 Documentation Layout
 
-Rust + `tokio` powers a set of decoupled services:
+All long-form documentation is in `docs/`:
 
-- **`service_channels`** – broadcast/messaging backbone
-- **`service_handles`** – lifecycle management of tasks
-- **`shared_resource`** – shared `Arc<Mutex<>>` state
-- **`pulse_system`** – centralized heartbeat (fast/med/slow)
+```
+docs/
+├── overview.md           ← High-level architecture & component summaries
+├── modules/              ← Internal subsystem deep dives
+└── services/             ← Shared service docs (logger, wiring, auth)
+```
 
-Modules like `Scheduler`, `Dispatcher`, `Hibernator`, `Harvester`, and `Logger` run concurrently, coordinating via these primitives.
-
----
-
-## 🌐 Rocket API & Authentication
-
-The `Rocket` HTTP API offers:
-
-- Job submission, state transitions, result retrieval
-- Worker registration and heartbeats
-- Log querying and stats
-
-**Auth**:
-
-- Token-based sessions in Redis
-- User records in PostgreSQL
-- Planned PKI challenge/response for CLI
+Use the conventions defined in [`docs/DOCS_CONVENTIONS.md`](docs/DOCS_CONVENTIONS.md) when adding or editing docs.
 
 ---
 
-## 🖥 CommandDeck
+## ⚙️ Quickstart (Local Development)
 
-The **`commanddeck`** is a Rust-powered CLI (no front-end framework) that runs in the Core container or standalone. It supports:
+### 1. Core Module
 
-- **Job CRUD**: create, list, update, delete
-- **Worker CRUD**: register, list, update, delete
-- **Log CRUD**: record, query, paginate, update, delete
-- **Inspect**: TUI for browsing Jobs or Core modules/logs
+```bash
+# Enter core folder
+eval "$(direnv export bash)" && cd core
 
-### 🔍 Inspection Tools
-
-Two TUI inspectors are available:
-
-- **JobInspect**: visualize job / worker / assignment state in a live TUI graph
-- **CoreInspect**: browse Core modules, see purpose & recent logs
-
-Both launch from the `consumer` menu under “Inspect.”
-
-### 📦 Job & Worker CRUD
-
-Through the `consumer` CLI you can:
-
-- Submit new Docker‐based jobs
-- List and filter by user, state, schedule
-- Assign jobs to workers, track status
-- Register and manage worker nodes
-- Query and paginate system logs
-
-Fully scriptable and automatable via shell.
-
----
-
-## ⏱️ Scheduled Execution with Hibernator
-
-The **`Hibernator`** module handles:
-
-- ⏰ **Delayed jobs** — run at specific times
-- 🔁 **Recurring jobs** — cron‐style schedules
-
-Schedules are stored in PostgreSQL and triggered by a persistent time-pulse.
-
----
-
-## 🧱 Worker Nodes
-
-Workers are stateless executors:
-
-- 🐳 Pull & run Docker images
-- 🌍 Poll Core for assignments
-- 📥 Return output & logs to Core
-- 🚀 Scale horizontally on any Docker host
-
----
-
-## 🔐 Security & Flexibility
-
-- ✅ Redis‐backed token auth
-- 🔏 SHA checksums for payload integrity
-- 👥 Multi‐user isolation via DB roles
-- 🌍 Public or private Core deployments
-- 🖥 CLI is stateless and containerized
-
----
-
-## Consumer
-
-A a Rust-powered CLI (no front-end framework), used for users to log in on a local
-or remote device to interact with the core. supports
-
-- Job submission
-- Job inspection
-- Finnished job retrieval
-
----
-
-## 🧪 Local Dev Quickstart
-
-Get everything up and running in two stages: Core → Consumer.
-
-1. Spin up the Core
-
-# Move into the core service
-
-cd core
-
-# 1.1 Start containers (Postgres, Redis, Core)
-
+# Start dependencies + core service
 docker compose up -d
 
-# 1.2 Run database migrations
-
+# Run migrations
 docker compose exec app diesel migration run
 
-# 1.3 Launch the CoreNode API
-
+# Launch API & engine
 docker compose exec app cargo run --bin core
+```
 
-# 1.4 (Optional) Launch the CommandDeck CLI
+### 2. CommandDeck (Optional)
 
+```bash
 docker compose exec app cargo run --bin commanddeck
+```
 
-# 1.5 Run Core tests
+### 3. Consumer CLI
 
-docker compose exec app cargo test 2. Launch the Consumer CLI
+```bash
+# Move to consumer
+dev cd ../consumer
 
-# Move into the consumer service
-
-cd ../consumer
-
-# 2.1 Start a long-running consumer container
-
+# Start consumer container
 docker compose up -d consumer
 
-# 2.2 Execute your interactive CLI
-
+# Launch interactive CLI
 docker compose exec consumer cargo run
+```
 
-# 2.3 Run Consumer tests
+---
 
-docker compose exec consumer cargo test
+For detailed instructions, see the [`docs/`](docs/overview.md) folder.
