@@ -9,63 +9,58 @@ on:
 jobs:
   build-and-deploy:
     name: Build, Test, Lint, Audit, Deploy
-    runs-on: [self-hosted] # Use the self-hosted runner (with appropriate labels if set)
+    runs-on: [self-hosted] # targets your Ubuntu runner
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
       # --- Core Module: Test, Lint, Audit ---
-      - name: Set up Core dependencies
+      - name: Start Postgres + Redis
         working-directory: core
-        run: docker-compose up -d postgres redis # start DB and Redis for core
-      - name: Core - Run Tests
+        run: docker compose up -d postgres redis
+
+      - name: Core – Tests
         working-directory: core
-        run: |
-          docker-compose run --rm app cargo test --all --exclude consumer
-        # ^-- runs `cargo test` inside the core's app container (with DB/Redis up)
-      - name: Core - Lint (Clippy)
+        run: docker compose run --rm app cargo test --all --exclude consumer
+
+      - name: Core – Clippy
         working-directory: core
-        run: |
-          docker-compose run --rm app /bin/bash -c "rustup component add clippy && cargo clippy -- -D warnings"
-      - name: Core - Security Audit
+        run: docker compose run --rm app bash -c "rustup component add clippy && cargo clippy -- -D warnings"
+
+      - name: Core – Security audit
         working-directory: core
         env:
-          RUSTSEC_ALLOW_WARNINGS: "true" # (optional) allow warnings, fail on vulnerabilities only
-        run: |
-          docker-compose run --rm app /bin/bash -c "cargo install cargo-audit && cargo audit"
+          RUSTSEC_ALLOW_WARNINGS: "true"
+        run: docker compose run --rm app bash -c "cargo install cargo-audit && cargo audit"
 
-      # Shut down core containers after tests (to clean up before deployment step)
-      - name: Teardown Core test environment
+      - name: Tear down Core test stack
         if: ${{ success() }}
         working-directory: core
-        run: docker-compose down -v
+        run: docker compose down -v
 
       # --- Consumer Module: Test, Lint, Audit ---
-      - name: Consumer - Run Tests
+      - name: Consumer – Tests
         working-directory: consumer
-        run: |
-          docker-compose run --rm consumer-test   # uses the Dockerfile builder stage to run `cargo test`
-      - name: Consumer - Lint (Clippy)
+        run: docker compose run --rm consumer-test
+
+      - name: Consumer – Clippy
         working-directory: consumer
-        run: |
-          docker-compose run --rm consumer-test /bin/bash -c "rustup component add clippy && cargo clippy -- -D warnings"
-      - name: Consumer - Security Audit
+        run: docker compose run --rm consumer-test bash -c "rustup component add clippy && cargo clippy -- -D warnings"
+
+      - name: Consumer – Security audit
         working-directory: consumer
         env:
           RUSTSEC_ALLOW_WARNINGS: "true"
-        run: |
-          docker-compose run --rm consumer-test /bin/bash -c "cargo install cargo-audit && cargo audit"
+        run: docker compose run --rm consumer-test bash -c "cargo install cargo-audit && cargo audit"
 
-      # --- Deployment: Core Service (on main branch only) ---
-      - name: Deploy Core Service
+      # --- Deploy Core (main branch only) ---
+      - name: Deploy Core service
         if: ${{ github.ref == 'refs/heads/main' && success() }}
         working-directory: core
         run: |
-          echo "Stopping existing core service..."
-          docker-compose down -v  # stop and remove old containers (and volumes if any)
-          echo "Starting updated core service..."
-          docker-compose up -d    # rebuild and start containers (detached)
-          # Run database migrations inside the new app container
-          docker-compose exec app diesel migration run
-          # Launch the core binary inside the container (detached)
-          docker-compose exec -d app cargo run --bin core
+          echo "Stopping old core containers"
+          docker compose down -v
+          echo "Starting updated core stack"
+          docker compose up -d
+          docker compose exec app diesel migration run
+          docker compose exec -d app cargo run --bin core
