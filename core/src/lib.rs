@@ -1,3 +1,6 @@
+#![warn(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![forbid(unsafe_code)]
+
 pub mod api;
 pub mod cli;
 pub mod commands;

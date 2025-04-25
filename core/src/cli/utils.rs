@@ -2,7 +2,7 @@ use crate::commands;
 use crate::commands::load_db_connection;
 use crate::database::repositories::JobAssignmentRepository;
 use crate::database::{
-    models::{job::Job, user::User, worker::Worker},
+    models::job::Job,
     repositories::{JobRepository, UserRepository, WorkerRepository},
 };
 use crate::shared::enums::job::JobStateEnum;

@@ -12,7 +12,7 @@ pub struct ServiceInitializer {
 
 impl ServiceInitializer {
     pub async fn new(
-        shared_resources: Arc<SharedResources>,
+        _shared_resources: Arc<SharedResources>,
         pulse_broadcaster: PulseBroadcaster,
     ) -> Self {
         // Initialize the services

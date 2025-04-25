@@ -5,8 +5,8 @@ use tokio::sync::{broadcast, mpsc, RwLock};
 /// Enum for different one-to-one channel types.
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub enum ChannelType {
-    CoreBridgeToMain_CoreEvents, //WARNING: not used either, used for mpsc not yet used
-    CoreBridgeToMain_Notification, // not used just example showing that multiple can be added
+    CoreBridgeToMainCoreEvents, //WARNING: not used either, used for mpsc not yet used
+    CoreBridgeToMainNotification, // not used just example showing that multiple can be added
 }
 
 // ====== Channel PAYLOAD ======
@@ -154,7 +154,7 @@ impl Default for ServiceWiring {
 async fn test_service_wiring() {
     let wiring = ServiceWiring::new();
     let (tx, rx) = mpsc::unbounded_channel::<EventPayload>();
-    let chan = ChannelType::CoreBridgeToMain_CoreEvents;
+    let chan = ChannelType::CoreBridgeToMainCoreEvents;
 
     // Add channel
     wiring.add_channel(chan.clone(), tx.clone(), rx).await;

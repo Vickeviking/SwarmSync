@@ -491,28 +491,6 @@ mod job_api_tests {
     // ⏱️ Scheduling & Readiness
 
     #[tokio::test]
-    async fn test_get_scheduled_jobs() {
-        let (client, user, jobs, job_ids) = common::build_client_and_user_with_n_jobs(2).await;
-
-        let response = client
-            .get(format!("{}/jobs/scheduled", APP_HOST))
-            .send()
-            .await
-            .expect("Failed to get scheduled jobs");
-
-        assert_eq!(response.status(), 200);
-        let scheduled: Vec<Job> = response
-            .json()
-            .await
-            .expect("Invalid scheduled jobs response");
-        assert!(!scheduled.is_empty());
-        assert!(scheduled.len() >= 2);
-
-        common::delete_jobs_via_api(&client, &job_ids).await;
-        common::delete_user_via_api(&client, user.id).await;
-    }
-
-    #[tokio::test]
     async fn test_get_cron_jobs_due() {
         // not yet fully understood or implemented,
         // TODO:

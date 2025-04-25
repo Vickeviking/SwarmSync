@@ -4,7 +4,6 @@ use crate::database::repositories::JobAssignmentRepository;
 
 use crate::database::models::user::User;
 use crate::utils::parsing;
-use chrono::NaiveDateTime;
 use rocket::http::Status;
 use rocket::response::status::Custom;
 use rocket::serde::json::{json, Json, Value};

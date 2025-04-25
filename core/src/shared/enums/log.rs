@@ -5,7 +5,6 @@ use diesel::pg::{Pg, PgValue};
 use diesel::serialize::ToSql;
 use diesel::sql_types::Text;
 use serde::{Deserialize, Serialize};
-use std::fmt::Display;
 use std::io::Write;
 use std::str::FromStr;
 

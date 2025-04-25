@@ -1,3 +1,7 @@
+#![forbid(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![deny(warnings)]
+#![forbid(unsafe_code)]
+
 mod client;
 mod commands;
 mod models;

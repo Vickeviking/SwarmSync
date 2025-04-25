@@ -1,16 +1,15 @@
 use crate::commands::fetch_logs_by_module;
 use crate::shared::enums::system::SystemModuleEnum;
 use anyhow::Result;
-use chrono::prelude::*;
 use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
 use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use ratatui::backend::CrosstermBackend;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Modifier, Style};
-use ratatui::text::{Span, Spans, Text};
+use ratatui::text::{Span, Spans};
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph};
 use ratatui::Terminal;
 use std::io;

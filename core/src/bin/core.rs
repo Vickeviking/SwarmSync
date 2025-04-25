@@ -47,15 +47,11 @@ async fn tokio_async_runtime() {
     println!("System started. Awaiting commands...");
 
     // Loop to handle shutdown events
-    loop {
-        tokio::select! {
-            _ = shutdown_notify.notified() => {
-                println!("Notify-based shutdown triggered.");
-                service_channels.send_event_to_all_services(CoreEvent::Shutdown).await;
-                service_handles.join_tasks().await;
-                println!("Shutdown complete.");
-                break;
-            }
-        }
-    }
+    shutdown_notify.notified().await;
+    println!("Notify‐based shutdown triggered.");
+    service_channels
+        .send_event_to_all_services(CoreEvent::Shutdown)
+        .await;
+    service_handles.join_tasks().await;
+    println!("Shutdown complete.");
 }

@@ -24,7 +24,7 @@ use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use crate::database::models::worker::{NewWorkerStatus, WorkerStatus};
 use crate::database::schema::*;
 use crate::shared::enums::workers::WorkerStatusEnum;
-use chrono::{NaiveDateTime, Utc};
+use chrono::Utc;
 
 pub struct WorkerStatusRepository;
 

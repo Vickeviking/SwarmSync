@@ -8,8 +8,8 @@ use crossterm::{
 };
 use ratatui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    layout::{Constraint, Direction, Layout},
+    style::{Color, Style},
     text::{Span, Spans, Text},
     widgets::{Block, Borders, Paragraph},
     Terminal,
