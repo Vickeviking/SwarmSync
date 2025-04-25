@@ -1,0 +1,17 @@
+services:
+  consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["./consumer"]
+
+  consumer-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    volumes:
+      - .:/usr/src/consumer
+    working_dir: /usr/src/consumer
+    entrypoint: ["cargo"]
+    command: ["test"]

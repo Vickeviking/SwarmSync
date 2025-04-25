@@ -1,0 +1,23 @@
+# 1) Build stage
+FROM rust:latest AS builder
+# inside the container, /usr/src/consumer is our project root
+WORKDIR /usr/src/consumer
+
+# copy just the manifests first to cache dependencies
+COPY Cargo.toml Cargo.lock ./
+
+# create a dummy src to let Cargo fetch deps
+RUN mkdir src && echo 'fn main(){}' > src/main.rs \
+  && cargo build --release \
+  && rm -rf src
+
+# now copy your real source and rebuild
+COPY . .
+RUN cargo build --release
+
+# 2) Runtime stage
+FROM debian:bookworm-slim
+WORKDIR /usr/local/bin
+COPY --from=builder /usr/src/consumer/target/release/consumer .
+
+CMD ["./consumer"]
