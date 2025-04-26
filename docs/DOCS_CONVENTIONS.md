@@ -98,3 +98,7 @@ Explain key algorithms, data structures, invariants, and edge cases.
 ```
 
 ---
+
+## Open Docs
+
+cargo doc --open
