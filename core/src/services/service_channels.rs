@@ -33,6 +33,7 @@ impl NotificationEvent {
 /// Global service channels for system-wide events.
 /// - `core_event_tx` broadcasts events to all subscribers.
 /// - `corebridge_to_main_tx` and `corebridge_to_main_rx` form a one-to-one channel.
+#[doc = include_str!("../../../docs/core/services/service_channels.md")]
 pub struct ServiceChannels {
     pub core_event_tx: broadcast::Sender<CoreEvent>,
 }

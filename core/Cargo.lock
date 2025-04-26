@@ -1278,6 +1278,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lsp_doc_stable"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b5e41be164a24e285095d3be8165a0c3333377826a3ebdcadf6095e1f6b7310"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "matchers"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2322,6 +2333,7 @@ dependencies = [
  "diesel",
  "diesel-async",
  "futures",
+ "lsp_doc_stable",
  "petgraph",
  "rand 0.8.5",
  "ratatui",
