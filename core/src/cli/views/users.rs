@@ -1,4 +1,8 @@
-use crate::{cli::utils::select_user, commands};
+use crate::{
+    cli::utils::{self, select_user, SelectMenuResult},
+    commands,
+};
+use anyhow::{Context, Result};
 use dialoguer::{theme::ColorfulTheme, Input, Select};
 
 pub async fn menu() -> anyhow::Result<()> {
@@ -72,7 +76,14 @@ async fn create_user() -> anyhow::Result<()> {
 }
 
 async fn update_user() -> anyhow::Result<()> {
-    let id: i32 = select_user().await.unwrap();
+    let user_id_menu_result: SelectMenuResult = utils::select_user()
+        .await
+        .context("Error selecting user with utils select_user TUI function")?;
+
+    let user_id = match user_id_menu_result {
+        SelectMenuResult::Back => return Ok(()),
+        SelectMenuResult::Chosen(id) => id,
+    };
     let username: String = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("New Username")
         .interact_text()?;
@@ -83,24 +94,50 @@ async fn update_user() -> anyhow::Result<()> {
         .with_prompt("New Password")
         .interact_text()?;
 
-    commands::update_user(id, username, email, password).await;
+    commands::update_user(user_id, username, email, password).await;
     Ok(())
 }
 
 async fn delete_user() -> anyhow::Result<()> {
-    let id: i32 = select_user().await.unwrap();
+    let user_id_menu_result: SelectMenuResult = utils::select_user()
+        .await
+        .context("Error selecting user with utils select_user TUI function")?;
 
-    commands::delete_user(id).await;
+    let user_id = match user_id_menu_result {
+        SelectMenuResult::Back => return Ok(()),
+        SelectMenuResult::Chosen(id) => id,
+    };
+
+    commands::delete_user(user_id).await;
     Ok(())
 }
 
-async fn delete_many_users() -> anyhow::Result<()> {
-    let start_id: i32 = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Start ID")
-        .interact_text()?;
-    let end_id: i32 = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("End ID")
-        .interact_text()?;
+async fn delete_many_users() -> Result<()> {
+    // helper to read an i32 or bail on "back"
+    async fn prompt_id(prompt: &str) -> Result<Option<i32>> {
+        let raw: String = Input::with_theme(&ColorfulTheme::default())
+            .with_prompt(format!("{prompt} (or type ‘back’ to cancel)"))
+            .interact_text()?;
+        if raw.eq_ignore_ascii_case("back") {
+            return Ok(None);
+        }
+        let id = raw
+            .parse::<i32>()
+            .context(format!("failed to parse `{raw}` as an integer"))?;
+        Ok(Some(id))
+    }
+
+    // Start ID
+    let Some(start_id) = prompt_id("Start ID").await? else {
+        // user hit “back”
+        return Ok(());
+    };
+
+    // End ID
+    let Some(end_id) = prompt_id("End ID").await? else {
+        // user hit “back”
+        return Ok(());
+    };
 
     commands::delete_many_users(start_id, end_id).await;
     Ok(())

@@ -1,4 +1,4 @@
 {
-  "base_url": "http://vango-server.ddns.net:8000",
+  "base_url": "http://core:8000",
   "last_username": "Admin"
 }

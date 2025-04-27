@@ -45,7 +45,6 @@ pub async fn choose_core_location() -> anyhow::Result<String> {
         }
     }
 
-    // ── 2. Fresh selection ────────────────────────────────────────
     let opts = &["Local", "Remote"];
     let choice = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Where is the Swarm-Sync Core running?")
@@ -53,8 +52,12 @@ pub async fn choose_core_location() -> anyhow::Result<String> {
         .default(0)
         .interact()?;
 
+    // Use CORE_API_URL inside Docker, fallback to localhost on host
+    let default_local =
+        std::env::var("CORE_API_URL").unwrap_or_else(|_| "http://127.0.0.1:8000".to_string());
+
     let base_url = match choice {
-        0 => "http://127.0.0.1:8000".to_string(),
+        0 => default_local,
         1 => {
             let ip: String = Input::new()
                 .with_prompt("Enter Core server IP")
@@ -63,7 +66,6 @@ pub async fn choose_core_location() -> anyhow::Result<String> {
         }
         _ => unreachable!(),
     };
-
     // ── 3. Verify connectivity, then save ─────────────────────────
     if !is_reachable(&base_url).await {
         println!("❌ Could not connect to Core at {}.", base_url);

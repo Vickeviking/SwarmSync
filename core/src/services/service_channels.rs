@@ -33,7 +33,7 @@ impl NotificationEvent {
 /// Global service channels for system-wide events.
 /// - `core_event_tx` broadcasts events to all subscribers.
 /// - `corebridge_to_main_tx` and `corebridge_to_main_rx` form a one-to-one channel.
-#[doc = include_str!("../../../docs/core/services/service_channels.md")]
+#[doc = include_str!("../../docs/core/services/service_channels.md")]
 pub struct ServiceChannels {
     pub core_event_tx: broadcast::Sender<CoreEvent>,
 }
@@ -134,13 +134,13 @@ impl ServiceWiring {
     /// Checks if the sender end exists for the given channel.
     pub async fn tx_exists(&self, channel: ChannelType) -> bool {
         let state = self.inner.read().await;
-        state.get(&channel).map_or(false, |(tx, _)| tx.is_some())
+        state.get(&channel).is_some_and(|(tx, _)| tx.is_some())
     }
 
     /// Checks if the receiver end exists for the given channel.
     pub async fn rx_exists(&self, channel: ChannelType) -> bool {
         let state = self.inner.read().await;
-        state.get(&channel).map_or(false, |(_, rx)| rx.is_some())
+        state.get(&channel).is_some_and(|(_, rx)| rx.is_some())
     }
 }
 

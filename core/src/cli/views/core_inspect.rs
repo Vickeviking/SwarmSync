@@ -9,7 +9,7 @@ use crossterm::terminal::{
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Modifier, Style};
-use ratatui::text::{Span, Spans};
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph};
 use ratatui::Terminal;
 use std::io;
@@ -54,12 +54,12 @@ pub async fn inspect() -> Result<()> {
                 .enumerate()
                 .map(|(i, m)| {
                     let content = if i == sel {
-                        Spans::from(Span::styled(
+                        Line::from(Span::styled(
                             format!("> {}", m),
                             Style::default().add_modifier(Modifier::BOLD),
                         ))
                     } else {
-                        Spans::from(Span::raw(m.clone()))
+                        Line::from(Span::raw(m.clone()))
                     };
                     ListItem::new(content)
                 })
@@ -83,7 +83,7 @@ pub async fn inspect() -> Result<()> {
             let log_items: Vec<ListItem> = logs
                 .iter()
                 .map(|l| {
-                    ListItem::new(Spans::from(Span::raw(format!(
+                    ListItem::new(Line::from(Span::raw(format!(
                         "{}: {}",
                         l.created_at.format("%Y-%m-%d %H:%M:%S"),
                         l.action
@@ -117,7 +117,6 @@ pub async fn inspect() -> Result<()> {
                 }
             }
         }
-        last_tick = Instant::now();
         last_tick = Instant::now();
     }
 

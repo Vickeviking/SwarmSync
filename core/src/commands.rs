@@ -294,7 +294,7 @@ pub async fn get_assignments_for_user(user_id: i32) -> Result<Vec<JobAssignment>
 pub async fn get_assignment_id_for_job(job_id: i32) -> anyhow::Result<Option<i32>> {
     let mut conn = load_db_connection().await;
     let assignments = JobAssignmentRepository::find_by_job_id(&mut conn, job_id).await?;
-    Ok(assignments.get(0).map(|a| a.id))
+    Ok(assignments.first().map(|a| a.id))
 }
 
 pub async fn list_assignments_filtered(user_id: i32, job_id: Option<i32>, worker_id: Option<i32>) {
@@ -312,8 +312,8 @@ pub async fn list_assignments_filtered(user_id: i32, job_id: Option<i32>, worker
     let filtered = all
         .into_iter()
         .filter(|a| job_ids.contains(&a.job_id))
-        .filter(|a| job_id.map_or(true, |jid| a.job_id == jid))
-        .filter(|a| worker_id.map_or(true, |wid| a.worker_id == wid))
+        .filter(|a| job_id.is_none_or(|jid| a.job_id == jid))
+        .filter(|a| worker_id.is_none_or(|wid| a.worker_id == wid))
         .collect::<Vec<_>>();
 
     if filtered.is_empty() {

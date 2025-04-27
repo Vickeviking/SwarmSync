@@ -6,45 +6,120 @@ use crate::database::{
     repositories::{JobRepository, UserRepository, WorkerRepository},
 };
 use crate::shared::enums::job::JobStateEnum;
+use anyhow::{Context, Result};
 use dialoguer::Input;
 use dialoguer::{theme::ColorfulTheme, Select};
+use std::io::{self, ErrorKind};
 
-pub async fn select_user() -> Option<i32> {
+/// Used as return type to either represent a 'back' or successfull select
+pub enum SelectMenuResult {
+    Chosen(i32),
+    Back,
+}
+
+/// TUI allowing a selection of a user from a list
+///
+/// # Returns
+/// SelectMenuResult holding either back or user_id
+pub async fn select_user() -> Result<SelectMenuResult, anyhow::Error> {
     let mut c = load_db_connection().await;
-    let users = UserRepository::list_all(&mut c, 100, 0).await.ok()?;
+    let users = UserRepository::list_all(&mut c, 100, 0)
+        .await
+        .context("Error listing users, list_all failed from UserRepository")?;
 
-    let choices: Vec<String> = users
+    let mut choices: Vec<String> = users
         .iter()
         .map(|u| format!("{} - {}", u.id, u.username))
         .collect();
+    let back = vec!["back".to_string()];
+    choices.splice(0..0, back);
+
     let selection = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Choose a user")
         .items(&choices)
         .default(0)
         .interact()
-        .ok()?;
+        .context("Something went wrong inside UI select")?;
 
-    Some(users[selection].id)
+    // if back choosen return 'Back'
+    if selection == 0 {
+        return Ok(SelectMenuResult::Back);
+    }
+
+    // Since we have back , -1 for the offset
+    Ok(SelectMenuResult::Chosen(users[selection - 1].id))
 }
 
-pub async fn select_job(user_id: i32) -> Option<i32> {
+/// TUI allowing a selection of job from {user_id} owned jobs
+///
+/// # Arguments
+/// * user_id - the user whos jobs is to be choosed from  
+///
+/// # Returns
+/// SelectMenuResult holding either back or 'job_id'
+pub async fn select_job(user_id: i32) -> Result<SelectMenuResult, anyhow::Error> {
     let mut c = load_db_connection().await;
     let jobs = JobRepository::list_by_admin(&mut c, user_id, 100, 0)
         .await
-        .ok()?;
+        .context("Could not list admins, error calling list_by_admin from JobRepository")?;
 
-    let choices: Vec<String> = jobs
+    let mut choices: Vec<String> = jobs
         .iter()
         .map(|j| format!("{} - {}", j.id, j.job_name))
         .collect();
+    let back = vec!["back".to_string()];
+    choices.splice(0..0, back);
+
     let selection = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Choose a job")
         .items(&choices)
         .default(0)
         .interact()
-        .ok()?;
+        .context("Error selecting user, Interact() failed")?;
 
-    Some(jobs[selection].id)
+    // if back choosen return 'Back'
+    if selection == 0 {
+        return Ok(SelectMenuResult::Back);
+    }
+
+    // Since we have back , -1 for the offset
+    Ok(SelectMenuResult::Chosen(jobs[selection - 1].id))
+}
+
+/// TUI allowing a selection of worker from {user_id} owned workers
+///
+/// # Arguments
+/// * user_id - the user whos workers is to be choosed from  
+///
+/// # Returns
+/// SelectMenuResult holding either back or 'worker_id'
+pub async fn select_worker(user_id: i32) -> Result<SelectMenuResult, anyhow::Error> {
+    let mut c = load_db_connection().await;
+    let workers = WorkerRepository::list_workers_by_admin(&mut c, user_id, 100, 0)
+        .await
+        .context("list_workers_by_admin failed")?;
+
+    let mut choices: Vec<String> = workers
+        .iter()
+        .map(|w| format!("{} - {}", w.id, w.label))
+        .collect();
+    let back = vec!["back".to_string()];
+    choices.splice(0..0, back);
+
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Choose a worker")
+        .items(&choices)
+        .default(0)
+        .interact()
+        .context("interact() failed, could not select worker from list in TUI")?;
+
+    // if back choosen return 'Back'
+    if selection == 0 {
+        return Ok(SelectMenuResult::Back);
+    }
+
+    // Since we have back , -1 for the offset
+    Ok(SelectMenuResult::Chosen(workers[selection - 1].id))
 }
 
 pub async fn select_job_with_any(user_id: i32) -> Option<Option<i32>> {
@@ -68,26 +143,6 @@ pub async fn select_job_with_any(user_id: i32) -> Option<Option<i32>> {
     } else {
         Some(Some(jobs[selection - 1].id))
     }
-}
-
-pub async fn select_worker(user_id: i32) -> Option<i32> {
-    let mut c = load_db_connection().await;
-    let workers = WorkerRepository::list_workers_by_admin(&mut c, user_id, 100, 0)
-        .await
-        .ok()?;
-
-    let choices: Vec<String> = workers
-        .iter()
-        .map(|w| format!("{} - {}", w.id, w.label))
-        .collect();
-    let selection = Select::with_theme(&ColorfulTheme::default())
-        .with_prompt("Choose a worker")
-        .items(&choices)
-        .default(0)
-        .interact()
-        .ok()?;
-
-    Some(workers[selection].id)
 }
 
 pub async fn select_worker_with_any(user_id: i32) -> Option<Option<i32>> {

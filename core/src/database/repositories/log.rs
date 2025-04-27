@@ -43,7 +43,7 @@ impl LogEntryRepository {
             .find(id)
             .get_result(c)
             .await
-            .map(|db_log: DBLogEntry| db_log.into())
+            .map(|db_log: DBLogEntry| db_log)
     }
 
     // Create a new log entry
@@ -55,7 +55,7 @@ impl LogEntryRepository {
             .values(new_log_entry)
             .get_result(c)
             .await
-            .map(|db_log: DBLogEntry| db_log.into())
+            .map(|db_log: DBLogEntry| db_log)
     }
 
     // Delete a log entry by ID

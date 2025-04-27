@@ -10,24 +10,26 @@ use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
-    text::{Span, Spans, Text},
+    text::{Line, Span, Text},
     widgets::{Block, Borders, Paragraph},
     Terminal,
 };
 
-use crate::cli::utils;
+use crate::cli::utils::{self, SelectMenuResult};
 use crate::commands;
 use crate::database::models::{job::Job, job::JobAssignment, worker::Worker};
 use crate::shared::enums::job::JobStateEnum;
-use dialoguer::Input;
+use anyhow::{Context, Result};
 
 pub async fn inspect() -> anyhow::Result<()> {
-    let user_id: i32 = utils::select_user().await.unwrap();
+    let user_id_menu_result: SelectMenuResult = utils::select_user()
+        .await
+        .context("Error selecting user with utils select_user TUI function")?;
 
-    let user = commands::get_user_by_id(user_id).await.unwrap_or_else(|_| {
-        println!("❌ Failed to fetch user");
-        std::process::exit(1);
-    });
+    let user_id = match user_id_menu_result {
+        SelectMenuResult::Back => return Ok(()),
+        SelectMenuResult::Chosen(id) => id,
+    };
 
     let jobs: Vec<Job> = commands::get_jobs_for_user(user_id)
         .await
@@ -39,7 +41,7 @@ pub async fn inspect() -> anyhow::Result<()> {
         .await
         .unwrap_or_default();
 
-    launch_graph_tui_with_data(&user.username, &jobs, &workers, &assignments)?;
+    launch_graph_tui_with_data(&jobs, &workers, &assignments)?;
     Ok(())
 }
 
@@ -49,7 +51,6 @@ struct ModuleView<'a> {
 }
 
 pub fn launch_graph_tui_with_data(
-    user_name: &str,
     jobs: &[Job],
     workers: &[Worker],
     assignments: &[JobAssignment],
@@ -60,7 +61,7 @@ pub fn launch_graph_tui_with_data(
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let result = run_app(&mut terminal, user_name, jobs, workers, assignments);
+    let result = run_app(&mut terminal, jobs, workers, assignments);
 
     disable_raw_mode()?;
     execute!(
@@ -75,7 +76,6 @@ pub fn launch_graph_tui_with_data(
 
 fn run_app<'a, B: ratatui::backend::Backend>(
     terminal: &mut Terminal<B>,
-    user_name: &str,
     jobs: &'a [Job],
     workers: &'a [Worker],
     assignments: &'a [JobAssignment],
@@ -137,7 +137,7 @@ fn run_app<'a, B: ratatui::backend::Backend>(
             }
         }
 
-        let views = vec![
+        let views = [
             ModuleView {
                 title: "👤 USER",
                 items: user_jobs,
@@ -168,7 +168,7 @@ fn run_app<'a, B: ratatui::backend::Backend>(
                 .split(outer_chunks[0]);
 
             for (i, view) in views.iter().enumerate() {
-                let items: Vec<Spans> = view
+                let items: Vec<Line> = view
                     .items
                     .iter()
                     .enumerate()
@@ -178,7 +178,7 @@ fn run_app<'a, B: ratatui::backend::Backend>(
                         } else {
                             label.to_string()
                         };
-                        Spans::from(Span::raw(content))
+                        Line::from(Span::raw(content))
                     })
                     .collect();
 
@@ -232,9 +232,7 @@ fn run_app<'a, B: ratatui::backend::Backend>(
                         }
                     }
                     KeyCode::Up => {
-                        if job_index > 0 {
-                            job_index -= 1;
-                        }
+                        job_index = job_index.saturating_sub(1);
                     }
                     _ => {}
                 }

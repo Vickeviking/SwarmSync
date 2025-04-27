@@ -1,12 +1,13 @@
 // src/cli/views/jobs.rs
 use crate::cli::utils::{
     move_job_state, select_assignment, select_job, select_job_with_any, select_user, select_worker,
-    select_worker_with_any,
+    select_worker_with_any, SelectMenuResult,
 };
 use crate::commands;
 use crate::shared::enums::{
     image_format::ImageFormatEnum, output::OutputTypeEnum, schedule::ScheduleTypeEnum,
 };
+use anyhow::Context;
 use dialoguer::{theme::ColorfulTheme, Input, Select};
 pub async fn user_perspective_menu() -> anyhow::Result<()> {
     loop {
@@ -35,7 +36,14 @@ pub async fn user_perspective_menu() -> anyhow::Result<()> {
 }
 
 async fn job_crud() -> anyhow::Result<()> {
-    let user_id: i32 = select_user().await.unwrap();
+    let user_id_menu_result: SelectMenuResult = select_user()
+        .await
+        .context("Could not select user through TUI function under utils")?;
+
+    let user_id = match user_id_menu_result {
+        SelectMenuResult::Back => return Ok(()),
+        SelectMenuResult::Chosen(id) => id,
+    };
 
     let options = vec!["Back", "List Jobs", "Create Job", "Delete Job", "Move Job"];
     loop {
@@ -121,11 +129,21 @@ async fn job_crud() -> anyhow::Result<()> {
                 .await;
             }
             3 => {
-                let job_id: i32 = select_job(user_id).await.unwrap();
+                let job_id_menu_result: SelectMenuResult = select_job(user_id).await.unwrap();
+                let job_id = match job_id_menu_result {
+                    SelectMenuResult::Back => return Ok(()),
+                    SelectMenuResult::Chosen(id) => id,
+                };
+
                 commands::remove_job(job_id).await;
             }
             4 => {
-                let job_id: i32 = select_job(user_id).await.unwrap();
+                let job_id_menu_result: SelectMenuResult = select_job(user_id).await.unwrap();
+                let job_id = match job_id_menu_result {
+                    SelectMenuResult::Back => return Ok(()),
+                    SelectMenuResult::Chosen(id) => id,
+                };
+
                 move_job_state(job_id).await?;
             }
             _ => unreachable!(),
@@ -136,7 +154,14 @@ async fn job_crud() -> anyhow::Result<()> {
 }
 
 async fn worker_crud() -> anyhow::Result<()> {
-    let user_id: i32 = select_user().await.unwrap();
+    let user_id_menu_result: SelectMenuResult = select_user()
+        .await
+        .context("Error selecting user with utils select_user TUI function")?;
+
+    let user_id = match user_id_menu_result {
+        SelectMenuResult::Back => return Ok(()),
+        SelectMenuResult::Chosen(id) => id,
+    };
 
     let options = vec![
         "Back",
@@ -200,9 +225,30 @@ async fn assign_job() -> anyhow::Result<()> {
         match choice {
             0 => break,
             1 => {
-                let user_id: i32 = select_user().await.unwrap();
-                let job_id: i32 = select_job(user_id).await.unwrap();
-                let worker_id: i32 = select_worker(user_id).await.unwrap();
+                let user_id_menu_result: SelectMenuResult = select_user()
+                    .await
+                    .context("Could not select user through TUI function under utils")?;
+
+                let user_id = match user_id_menu_result {
+                    SelectMenuResult::Back => return Ok(()),
+                    SelectMenuResult::Chosen(id) => id,
+                };
+                let job_id_menu_result: SelectMenuResult = select_job(user_id)
+                    .await
+                    .context("Could not select job through TUI function under utils")?;
+
+                let job_id = match job_id_menu_result {
+                    SelectMenuResult::Back => return Ok(()),
+                    SelectMenuResult::Chosen(id) => id,
+                };
+                let worker_id_menu_result: SelectMenuResult = select_job(user_id)
+                    .await
+                    .context("Could not select worker through TUI function under utils")?;
+
+                let worker_id = match worker_id_menu_result {
+                    SelectMenuResult::Back => return Ok(()),
+                    SelectMenuResult::Chosen(id) => id,
+                };
                 commands::assign_job_to_worker(job_id, worker_id).await;
             }
             2 => {
@@ -210,7 +256,14 @@ async fn assign_job() -> anyhow::Result<()> {
                 commands::delete_assignment(assignment_id).await;
             }
             3 => {
-                let user_id: i32 = select_user().await.unwrap();
+                let user_id_menu_result: SelectMenuResult = select_user()
+                    .await
+                    .context("Could not select user through TUI function under utils")?;
+
+                let user_id = match user_id_menu_result {
+                    SelectMenuResult::Back => return Ok(()),
+                    SelectMenuResult::Chosen(id) => id,
+                };
                 let job_id: Option<i32> = select_job_with_any(user_id).await.unwrap_or(None);
                 let worker_id: Option<i32> = select_worker_with_any(user_id).await.unwrap_or(None);
 
