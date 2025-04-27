@@ -4,6 +4,7 @@ use diesel::pg::{Pg, PgValue};
 use diesel::serialize::ToSql;
 use diesel::sql_types::Text;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::io::Write;
 use std::str::FromStr;
 
@@ -14,12 +15,13 @@ pub enum ScheduleTypeEnum {
     Cron,
 }
 
-impl ToString for ScheduleTypeEnum {
-    fn to_string(&self) -> String {
-        match self {
-            ScheduleTypeEnum::Once => "Once".to_string(),
-            ScheduleTypeEnum::Cron => "Cron".to_string(),
-        }
+impl fmt::Display for ScheduleTypeEnum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            ScheduleTypeEnum::Once => "Once",
+            ScheduleTypeEnum::Cron => "Cron",
+        };
+        write!(f, "{}", label)
     }
 }
 

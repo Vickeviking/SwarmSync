@@ -160,21 +160,21 @@ pub async fn update_user(
                 })),
             ));
         }
-        Some(auth::hash_password(pwd.clone().to_string()).map_err(|_| {
+        auth::hash_password(pwd.clone().to_string()).map_err(|_| {
             Custom(
                 Status::InternalServerError,
                 Json(json!({"error": "Password hashing failed"})),
             )
-        })?)
+        })?
     } else {
-        Some(user.password_hash.clone()) // preserve old one
+        user.password_hash.clone() // preserve old one
     };
 
     let updated = User {
         id: user.id,
         username: update_req.username.clone(),
         email: update_req.email.clone(),
-        password_hash: password_hash.unwrap(),
+        password_hash,
         created_at: user.created_at,
     };
 

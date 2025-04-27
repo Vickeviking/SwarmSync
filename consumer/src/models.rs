@@ -1,7 +1,8 @@
 use chrono::NaiveDateTime;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 /// User information returned by the backend (sanitized, without password).
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 pub struct UserResponse {
     pub id: i32,
@@ -11,6 +12,7 @@ pub struct UserResponse {
 }
 
 /// Job model returned from the backend.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 pub struct Job {
     pub id: i32,
@@ -30,6 +32,7 @@ pub struct Job {
 }
 
 /// Job result model returned from the backend.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 pub struct JobResult {
     pub id: i32,

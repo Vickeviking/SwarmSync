@@ -1,5 +1,4 @@
 use swarmsync_core::cli::run_cli;
-use tokio;
 
 #[tokio::main]
 async fn main() {

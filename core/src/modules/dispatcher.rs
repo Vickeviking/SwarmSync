@@ -2,6 +2,7 @@ use crate::shared::{enums::system::CoreEvent, SharedResources};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
+#[allow(dead_code)]
 pub struct Dispatcher {
     shared_resources: Arc<SharedResources>,
     core_event_rx: broadcast::Receiver<CoreEvent>,

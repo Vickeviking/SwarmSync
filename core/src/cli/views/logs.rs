@@ -1,12 +1,6 @@
 use crate::commands::{
-    create_log_entry,
-    delete_log_entry,
-    fetch_log_entry,
-    fetch_logs,
-    fetch_logs_by_action,
-    fetch_logs_by_level,
-    fetch_logs_by_module,
-    update_log_entry,
+    create_log_entry, delete_log_entry, fetch_log_entry, fetch_logs, fetch_logs_by_action,
+    fetch_logs_by_level, fetch_logs_by_module, update_log_entry,
 };
 use crate::database::models::log::DBLogEntry;
 use crate::shared::enums::{log::LogActionEnum, log::LogLevelEnum, system::SystemModuleEnum};
@@ -55,19 +49,31 @@ async fn create_flow() -> Result<()> {
         .with_prompt("Client IP (or blank)")
         .allow_empty(true)
         .interact_text()?;
-    let client_ip = if raw_ip.trim().is_empty() { None } else { Some(raw_ip) };
+    let client_ip = if raw_ip.trim().is_empty() {
+        None
+    } else {
+        Some(raw_ip)
+    };
 
     let raw_user: String = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Client Username (or blank)")
         .allow_empty(true)
         .interact_text()?;
-    let client_username = if raw_user.trim().is_empty() { None } else { Some(raw_user) };
+    let client_username = if raw_user.trim().is_empty() {
+        None
+    } else {
+        Some(raw_user)
+    };
 
     let raw_msg: String = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Custom Message (or blank)")
         .allow_empty(true)
         .interact_text()?;
-    let custom_msg = if raw_msg.trim().is_empty() { None } else { Some(raw_msg) };
+    let custom_msg = if raw_msg.trim().is_empty() {
+        None
+    } else {
+        Some(raw_msg)
+    };
 
     create_log_entry(
         level,
@@ -78,7 +84,7 @@ async fn create_flow() -> Result<()> {
         client_username,
         custom_msg,
     )
-    .await;
+    .await?;
     Ok(())
 }
 
@@ -126,7 +132,9 @@ async fn browse_all() -> Result<()> {
             println!("📭 No logs.");
             break;
         }
-        if select_and_manage(&logs).await? { break; }
+        if select_and_manage(&logs).await? {
+            break;
+        }
         offset = paginate_offset(offset, limit)?;
     }
     Ok(())
@@ -147,7 +155,9 @@ async fn browse_action() -> Result<()> {
             println!("📭 No logs for action `{}`.", action);
             break;
         }
-        if select_and_manage(&logs).await? { break; }
+        if select_and_manage(&logs).await? {
+            break;
+        }
         offset = paginate_offset(offset, limit)?;
     }
     Ok(())
@@ -168,7 +178,9 @@ async fn browse_level() -> Result<()> {
             println!("📭 No logs for level `{}`.", level);
             break;
         }
-        if select_and_manage(&logs).await? { break; }
+        if select_and_manage(&logs).await? {
+            break;
+        }
         offset = paginate_offset(offset, limit)?;
     }
     Ok(())
@@ -189,7 +201,9 @@ async fn browse_module() -> Result<()> {
             println!("📭 No logs for module {:?}.", module);
             break;
         }
-        if select_and_manage(&logs).await? { break; }
+        if select_and_manage(&logs).await? {
+            break;
+        }
         offset = paginate_offset(offset, limit)?;
     }
     Ok(())
@@ -197,7 +211,10 @@ async fn browse_module() -> Result<()> {
 
 async fn select_and_manage(logs: &[DBLogEntry]) -> Result<bool, anyhow::Error> {
     for entry in logs {
-        println!("({}) [{}] {} – {}", entry.id, entry.level, entry.module, entry.action);
+        println!(
+            "({}) [{}] {} – {}",
+            entry.id, entry.level, entry.module, entry.action
+        );
     }
     let mut items: Vec<String> = logs.iter().map(|l| l.id.to_string()).collect();
     items.extend_from_slice(&["Next Page".into(), "Prev Page".into(), "Back".into()]);
@@ -283,7 +300,10 @@ async fn manage_single_log(id: i32) -> Result<(), anyhow::Error> {
 
         // Expires At: prompt with default, blank = keep
         let exp_str: String = Input::with_theme(&ColorfulTheme::default())
-            .with_prompt(format!("Expires At [{}] (YYYY-MM-DD HH:MM:SS)", entry.expires_at))
+            .with_prompt(format!(
+                "Expires At [{}] (YYYY-MM-DD HH:MM:SS)",
+                entry.expires_at
+            ))
             .allow_empty(true)
             .interact_text()?;
         if !exp_str.trim().is_empty() {
@@ -303,7 +323,10 @@ async fn manage_single_log(id: i32) -> Result<(), anyhow::Error> {
 
         // Client Username
         let user_str: String = Input::with_theme(&ColorfulTheme::default())
-            .with_prompt(format!("Client Username [{:?}]", entry.client_connected_username))
+            .with_prompt(format!(
+                "Client Username [{:?}]",
+                entry.client_connected_username
+            ))
             .allow_empty(true)
             .interact_text()?;
         if !user_str.trim().is_empty() {
@@ -320,10 +343,10 @@ async fn manage_single_log(id: i32) -> Result<(), anyhow::Error> {
         }
 
         // Perform update
-        update_log_entry(id, entry).await;
+        update_log_entry(id, entry).await?;
     } else if choice == 2 {
         // Delete
-        delete_log_entry(id).await;
+        delete_log_entry(id).await?;
     }
 
     Ok(())

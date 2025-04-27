@@ -1,3 +1,4 @@
+use std::fmt;
 use std::io::Write;
 use std::str::FromStr;
 
@@ -19,15 +20,16 @@ pub enum JobStateEnum {
     Failed, // Can store dynamic error message
 }
 
-impl ToString for JobStateEnum {
-    fn to_string(&self) -> String {
-        match self {
-            JobStateEnum::Submitted => String::from("Submitted"),
-            JobStateEnum::Queued => String::from("Queued"),
-            JobStateEnum::Running => String::from("Running"),
-            JobStateEnum::Completed => String::from("Completed"),
-            JobStateEnum::Failed => String::from("Failed"),
-        }
+impl fmt::Display for JobStateEnum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            JobStateEnum::Submitted => "Submitted",
+            JobStateEnum::Queued => "Queued",
+            JobStateEnum::Running => "Running",
+            JobStateEnum::Completed => "Completed",
+            JobStateEnum::Failed => "Failed",
+        };
+        write!(f, "{}", label)
     }
 }
 
@@ -82,12 +84,13 @@ pub enum JobScheduleEnum {
     Cron,
 }
 
-impl ToString for JobScheduleEnum {
-    fn to_string(&self) -> String {
-        match self {
-            JobScheduleEnum::Once => String::from("Once"),
-            JobScheduleEnum::Cron => String::from("Cron"),
-        }
+impl fmt::Display for JobScheduleEnum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            JobScheduleEnum::Once => "Once",
+            JobScheduleEnum::Cron => "Cron",
+        };
+        write!(f, "{}", label)
     }
 }
 

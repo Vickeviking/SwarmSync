@@ -4,6 +4,7 @@ use diesel::pg::{Pg, PgValue};
 use diesel::serialize::ToSql;
 use diesel::sql_types::Text;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::io::Write;
 use std::str::FromStr;
 
@@ -14,12 +15,13 @@ pub enum OutputTypeEnum {
     Files, // Files will be stored separately
 }
 
-impl ToString for OutputTypeEnum {
-    fn to_string(&self) -> String {
-        match self {
-            OutputTypeEnum::Stdout => String::from("Stdout"),
-            OutputTypeEnum::Files => String::from("Files"),
-        }
+impl fmt::Display for OutputTypeEnum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            OutputTypeEnum::Stdout => "Stdout",
+            OutputTypeEnum::Files => "Files",
+        };
+        write!(f, "{}", label)
     }
 }
 

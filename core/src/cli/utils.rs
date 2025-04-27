@@ -9,7 +9,6 @@ use crate::shared::enums::job::JobStateEnum;
 use anyhow::{Context, Result};
 use dialoguer::Input;
 use dialoguer::{theme::ColorfulTheme, Select};
-use std::io::{self, ErrorKind};
 
 /// Used as return type to either represent a 'back' or successfull select
 pub enum SelectMenuResult {
@@ -22,7 +21,7 @@ pub enum SelectMenuResult {
 /// # Returns
 /// SelectMenuResult holding either back or user_id
 pub async fn select_user() -> Result<SelectMenuResult, anyhow::Error> {
-    let mut c = load_db_connection().await;
+    let mut c = load_db_connection().await?;
     let users = UserRepository::list_all(&mut c, 100, 0)
         .await
         .context("Error listing users, list_all failed from UserRepository")?;
@@ -58,7 +57,7 @@ pub async fn select_user() -> Result<SelectMenuResult, anyhow::Error> {
 /// # Returns
 /// SelectMenuResult holding either back or 'job_id'
 pub async fn select_job(user_id: i32) -> Result<SelectMenuResult, anyhow::Error> {
-    let mut c = load_db_connection().await;
+    let mut c = load_db_connection().await?;
     let jobs = JobRepository::list_by_admin(&mut c, user_id, 100, 0)
         .await
         .context("Could not list admins, error calling list_by_admin from JobRepository")?;
@@ -94,7 +93,7 @@ pub async fn select_job(user_id: i32) -> Result<SelectMenuResult, anyhow::Error>
 /// # Returns
 /// SelectMenuResult holding either back or 'worker_id'
 pub async fn select_worker(user_id: i32) -> Result<SelectMenuResult, anyhow::Error> {
-    let mut c = load_db_connection().await;
+    let mut c = load_db_connection().await?;
     let workers = WorkerRepository::list_workers_by_admin(&mut c, user_id, 100, 0)
         .await
         .context("list_workers_by_admin failed")?;
@@ -122,64 +121,18 @@ pub async fn select_worker(user_id: i32) -> Result<SelectMenuResult, anyhow::Err
     Ok(SelectMenuResult::Chosen(workers[selection - 1].id))
 }
 
-pub async fn select_job_with_any(user_id: i32) -> Option<Option<i32>> {
-    let mut c = load_db_connection().await;
-    let jobs = JobRepository::list_by_admin(&mut c, user_id, 100, 0)
-        .await
-        .ok()?;
-
-    let mut choices = vec!["Any".to_string()];
-    choices.extend(jobs.iter().map(|j| format!("{} - {}", j.id, j.job_name)));
-
-    let selection = Select::with_theme(&ColorfulTheme::default())
-        .with_prompt("Choose a job (or Any)")
-        .items(&choices)
-        .default(0)
-        .interact()
-        .ok()?;
-
-    if selection == 0 {
-        Some(None)
-    } else {
-        Some(Some(jobs[selection - 1].id))
-    }
-}
-
-pub async fn select_worker_with_any(user_id: i32) -> Option<Option<i32>> {
-    let mut c = load_db_connection().await;
-    let workers = WorkerRepository::list_workers_by_admin(&mut c, user_id, 100, 0)
-        .await
-        .ok()?;
-
-    let mut choices = vec!["Any".to_string()];
-    choices.extend(workers.iter().map(|w| format!("{} - {}", w.id, w.label)));
-
-    let selection = Select::with_theme(&ColorfulTheme::default())
-        .with_prompt("Choose a worker (or Any)")
-        .items(&choices)
-        .default(0)
-        .interact()
-        .ok()?;
-
-    if selection == 0 {
-        Some(None)
-    } else {
-        Some(Some(workers[selection - 1].id))
-    }
-}
-
-pub async fn select_assignment() -> Option<i32> {
-    let mut c = load_db_connection().await;
+pub async fn select_assignment() -> Result<SelectMenuResult, anyhow::Error> {
+    let mut c = load_db_connection().await?;
     let assignments = JobAssignmentRepository::list_active_assignments(&mut c)
         .await
-        .ok()?;
+        .context("list active assignments failed in select assignments TUI")?;
 
     if assignments.is_empty() {
         println!("📭 No active assignments found.");
-        return None;
+        return Ok(SelectMenuResult::Back);
     }
 
-    let choices: Vec<String> = assignments
+    let mut choices: Vec<String> = assignments
         .iter()
         .map(|a| {
             format!(
@@ -193,15 +146,62 @@ pub async fn select_assignment() -> Option<i32> {
             )
         })
         .collect();
+    let back = vec!["back".to_string()];
+    choices.splice(0..0, back);
 
     let selection = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Choose an assignment")
         .items(&choices)
         .default(0)
         .interact()
-        .ok()?;
+        .context("TUI for selecting assignment failed")?;
 
-    Some(assignments[selection].id)
+    // if back choosen return 'Back'
+    if selection == 0 {
+        return Ok(SelectMenuResult::Back);
+    }
+
+    Ok(SelectMenuResult::Chosen(assignments[selection - 1].id))
+}
+
+pub async fn select_job_with_any(user_id: i32) -> anyhow::Result<Option<i32>, anyhow::Error> {
+    let mut c = load_db_connection().await?;
+    let jobs = JobRepository::list_by_admin(&mut c, user_id, 100, 0).await?;
+
+    let mut choices = vec!["Any".to_string()];
+    choices.extend(jobs.iter().map(|j| format!("{} - {}", j.id, j.job_name)));
+
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Choose a job (or Any)")
+        .items(&choices)
+        .default(0)
+        .interact()?;
+
+    if selection == 0 {
+        Ok(None)
+    } else {
+        Ok(Some(jobs[selection - 1].id))
+    }
+}
+
+pub async fn select_worker_with_any(user_id: i32) -> anyhow::Result<Option<i32>, anyhow::Error> {
+    let mut c = load_db_connection().await?;
+    let workers = WorkerRepository::list_workers_by_admin(&mut c, user_id, 100, 0).await?;
+
+    let mut choices = vec!["Any".to_string()];
+    choices.extend(workers.iter().map(|w| format!("{} - {}", w.id, w.label)));
+
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Choose a worker (or Any)")
+        .items(&choices)
+        .default(0)
+        .interact()?;
+
+    if selection == 0 {
+        Ok(None)
+    } else {
+        Ok(Some(workers[selection - 1].id))
+    }
 }
 
 pub async fn move_job_state(job_id: i32) -> anyhow::Result<()> {
@@ -221,7 +221,7 @@ pub async fn move_job_state(job_id: i32) -> anyhow::Result<()> {
         }
 
         if let Some(assign_id) = commands::get_assignment_id_for_job(job_id).await? {
-            commands::delete_assignment(assign_id).await;
+            commands::delete_assignment(assign_id).await?;
             println!("🗑️ Assignment removed.");
         } else {
             println!("⚠️ No assignment found. Proceeding.");
@@ -260,26 +260,26 @@ pub async fn move_job_state(job_id: i32) -> anyhow::Result<()> {
 }
 
 pub async fn mark_submitted(id: i32) -> anyhow::Result<Job> {
-    let mut conn = load_db_connection().await;
+    let mut conn = load_db_connection().await?;
     Ok(JobRepository::mark_submitted(&mut conn, id).await?)
 }
 
 pub async fn mark_queued(id: i32) -> anyhow::Result<Job> {
-    let mut conn = load_db_connection().await;
+    let mut conn = load_db_connection().await?;
     Ok(JobRepository::mark_queued(&mut conn, id).await?)
 }
 
 pub async fn mark_running(id: i32) -> anyhow::Result<Job> {
-    let mut conn = load_db_connection().await;
+    let mut conn = load_db_connection().await?;
     Ok(JobRepository::mark_running(&mut conn, id).await?)
 }
 
 pub async fn mark_succeeded(id: i32) -> anyhow::Result<Job> {
-    let mut conn = load_db_connection().await;
+    let mut conn = load_db_connection().await?;
     Ok(JobRepository::mark_succeeded(&mut conn, id).await?)
 }
 
 pub async fn mark_failed(id: i32, message: &str) -> anyhow::Result<Job> {
-    let mut conn = load_db_connection().await;
+    let mut conn = load_db_connection().await?;
     Ok(JobRepository::mark_failed(&mut conn, id, message).await?)
 }

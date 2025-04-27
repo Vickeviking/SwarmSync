@@ -13,57 +13,75 @@ use crate::shared::enums::output::OutputTypeEnum;
 use crate::shared::enums::schedule::ScheduleTypeEnum;
 use crate::shared::enums::system::SystemModuleEnum;
 use crate::shared::enums::workers::OSEnum;
+use anyhow::Context;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use diesel_async::{AsyncConnection, AsyncPgConnection};
 
-pub async fn load_db_connection() -> AsyncPgConnection {
-    let database_url = std::env::var("DATABASE_URL").expect("Cannot load DB url from environment");
-    AsyncPgConnection::establish(&database_url)
+#[allow(clippy::expect_used)]
+pub async fn load_db_connection() -> anyhow::Result<AsyncPgConnection, anyhow::Error> {
+    let database_url =
+        std::env::var("DATABASE_URL").context("Cannot load DB url from environment")?;
+    let conn = AsyncPgConnection::establish(&database_url)
         .await
-        .expect("Cannot connect to Postgres")
+        .context("Cannot connect to Postgres")?;
+    Ok(conn)
 }
 
-pub async fn create_user(username: String, email: String, password: String) {
-    let mut c = load_db_connection().await;
+pub async fn create_user(
+    username: String,
+    email: String,
+    password: String,
+) -> anyhow::Result<(), anyhow::Error> {
+    let mut c = load_db_connection().await?;
 
-    let password_hash = auth::hash_password(password).unwrap();
+    let password_hash = auth::hash_password(password).context("Hashing failed")?;
     let new_user = NewUser {
         username,
         email,
         password_hash,
     };
 
-    let created = UserRepository::create(&mut c, new_user).await.unwrap();
+    let created = UserRepository::create(&mut c, new_user)
+        .await
+        .context("UserRepository create failed")?;
     println!("✅ Created user: {} ({})", created.username, created.email);
+    Ok(())
 }
 
 pub async fn get_user_by_id(id: i32) -> Result<User, anyhow::Error> {
-    let mut c = load_db_connection().await;
+    let mut c = load_db_connection().await?;
     let user = UserRepository::find_by_id(&mut c, id).await?;
     Ok(user)
 }
 
-pub async fn list_users(limit: i64, offset: i64) {
-    let mut c = load_db_connection().await;
+pub async fn list_users(limit: i64, offset: i64) -> anyhow::Result<(), anyhow::Error> {
+    let mut c = load_db_connection().await?;
 
     let users = UserRepository::list_all(&mut c, limit, offset)
         .await
-        .unwrap();
+        .context("list all failed from UserRepository")?;
     println!("📄 Listing users (limit: {}, offset: {}):", limit, offset);
     for user in users {
         println!("({})- {} <{}>", user.id, user.username, user.email);
     }
+    Ok(())
 }
 
-pub async fn update_user(id: i32, username: String, email: String, password: String) {
-    let mut c = load_db_connection().await;
+pub async fn update_user(
+    id: i32,
+    username: String,
+    email: String,
+    password: String,
+) -> anyhow::Result<(), anyhow::Error> {
+    let mut c = load_db_connection().await?;
 
     //time placeholder
-    let d = NaiveDate::from_ymd_opt(2004, 1, 9).unwrap();
-    let t = NaiveTime::from_hms_opt(0, 0, 0).unwrap();
+    let d = NaiveDate::from_ymd_opt(2004, 1, 9).context("invalid time placeholder")?;
+    let t = NaiveTime::from_hms_opt(0, 0, 0).context("invalid time placeholder")?;
     let dt = NaiveDateTime::new(d, t);
 
-    let password_hash = auth::hash_password(password).unwrap();
+    let password_hash =
+        auth::hash_password(password).context("password hashing failed with argon2")?;
     let user = User {
         id,
         username,
@@ -72,26 +90,32 @@ pub async fn update_user(id: i32, username: String, email: String, password: Str
         created_at: dt,
     };
 
-    let updated = UserRepository::update(&mut c, id, user).await.unwrap();
+    let updated = UserRepository::update(&mut c, id, user)
+        .await
+        .context("User update failed in UserRepository")?;
     println!(
         "✏️ Updated user {} -> {} ({})",
         id, updated.username, updated.email
     );
+    Ok(())
 }
 
-pub async fn delete_user(id: i32) {
-    let mut c = load_db_connection().await;
+pub async fn delete_user(id: i32) -> anyhow::Result<(), anyhow::Error> {
+    let mut c = load_db_connection().await?;
 
-    let deleted = UserRepository::delete(&mut c, id).await.unwrap();
+    let deleted = UserRepository::delete(&mut c, id)
+        .await
+        .context("UserRepository delete failed")?;
     if deleted > 0 {
         println!("🗑️ Deleted user with id {}", id);
     } else {
         println!("⚠️ No user found with id {}", id);
     }
+    Ok(())
 }
 
-pub async fn delete_many_users(start: i32, end: i32) {
-    let mut c = load_db_connection().await;
+pub async fn delete_many_users(start: i32, end: i32) -> anyhow::Result<(), anyhow::Error> {
+    let mut c = load_db_connection().await?;
 
     for id in start..=end {
         match UserRepository::delete(&mut c, id).await {
@@ -101,10 +125,12 @@ pub async fn delete_many_users(start: i32, end: i32) {
             Err(e) => println!("❌ Error deleting user {}: {}", id, e),
         }
     }
+
+    Ok(())
 }
 
 // ======= JOBS =========
-
+#[allow(clippy::too_many_arguments)]
 pub async fn create_full_job(
     user_id: i32,
     job_name: String,
@@ -114,8 +140,8 @@ pub async fn create_full_job(
     output_paths: Option<Vec<Option<String>>>,
     schedule_type: ScheduleTypeEnum,
     cron_expression: Option<String>,
-) {
-    let mut c = load_db_connection().await;
+) -> anyhow::Result<(), anyhow::Error> {
+    let mut c = load_db_connection().await?;
 
     let new_job = NewJob {
         user_id,
@@ -135,10 +161,11 @@ pub async fn create_full_job(
         Ok(job) => println!("✅ Created job '{}' (id: {})", job.job_name, job.id),
         Err(e) => eprintln!("❌ Failed to create job: {}", e),
     }
+    Ok(())
 }
 
-pub async fn list_jobs_by_user(user_id: i32) {
-    let mut c = load_db_connection().await;
+pub async fn list_jobs_by_user(user_id: i32) -> anyhow::Result<(), anyhow::Error> {
+    let mut c = load_db_connection().await?;
 
     let limit = 10;
     let offset = 0;
@@ -154,26 +181,28 @@ pub async fn list_jobs_by_user(user_id: i32) {
         }
         Err(e) => eprintln!("❌ Failed to fetch jobs: {}", e),
     }
+    Ok(())
 }
 
-pub async fn remove_job(job_id: i32) {
-    let mut c = load_db_connection().await;
+pub async fn remove_job(job_id: i32) -> anyhow::Result<(), anyhow::Error> {
+    let mut c = load_db_connection().await?;
     match JobRepository::delete(&mut c, job_id).await {
         Ok(n) if n > 0 => println!("🗑️ Deleted job with ID {}", job_id),
         Ok(_) => println!("⚠️ No job found with ID {}", job_id),
         Err(e) => eprintln!("❌ Error deleting job {}: {}", job_id, e),
     }
+    Ok(())
 }
 
 pub async fn get_job_by_id(id: i32) -> anyhow::Result<Job> {
-    let mut conn = load_db_connection().await;
+    let mut conn = load_db_connection().await?;
     Ok(JobRepository::find_by_id(&mut conn, id).await?)
 }
 
 // ======= WORKERS =========
 
-pub async fn create_worker(user_id: i32, label: String) {
-    let mut c = load_db_connection().await;
+pub async fn create_worker(user_id: i32, label: String) -> anyhow::Result<(), anyhow::Error> {
+    let mut c = load_db_connection().await?;
 
     let new_worker = NewWorker {
         user_id,
@@ -192,10 +221,12 @@ pub async fn create_worker(user_id: i32, label: String) {
         Ok(worker) => println!("✅ Created worker '{}' (id: {})", worker.label, worker.id),
         Err(e) => eprintln!("❌ Failed to create worker: {}", e),
     }
+
+    Ok(())
 }
 
-pub async fn update_worker(worker_id: i32, label: String) {
-    let mut c = load_db_connection().await;
+pub async fn update_worker(worker_id: i32, label: String) -> anyhow::Result<(), anyhow::Error> {
+    let mut c = load_db_connection().await?;
 
     match WorkerRepository::find_by_id(&mut c, worker_id).await {
         Ok(mut worker) => {
@@ -207,20 +238,26 @@ pub async fn update_worker(worker_id: i32, label: String) {
         }
         Err(e) => eprintln!("❌ Worker not found: {}", e),
     }
+    Ok(())
 }
 
-pub async fn delete_worker(worker_id: i32) {
-    let mut c = load_db_connection().await;
+pub async fn delete_worker(worker_id: i32) -> anyhow::Result<(), anyhow::Error> {
+    let mut c = load_db_connection().await?;
 
     match WorkerRepository::delete_worker(&mut c, worker_id).await {
         Ok(n) if n > 0 => println!("🗑️ Deleted worker ID {}", worker_id),
         Ok(_) => println!("⚠️ No worker found with ID {}", worker_id),
         Err(e) => eprintln!("❌ Failed to delete worker {}: {}", worker_id, e),
     }
+    Ok(())
 }
 
-pub async fn list_workers_by_user(user_id: i32, limit: i64, offset: i64) {
-    let mut c = load_db_connection().await;
+pub async fn list_workers_by_user(
+    user_id: i32,
+    limit: i64,
+    offset: i64,
+) -> anyhow::Result<(), anyhow::Error> {
+    let mut c = load_db_connection().await?;
     match WorkerRepository::list_workers_by_admin(&mut c, user_id, limit, offset).await {
         Ok(workers) => {
             if workers.is_empty() {
@@ -233,21 +270,26 @@ pub async fn list_workers_by_user(user_id: i32, limit: i64, offset: i64) {
         }
         Err(e) => eprintln!("❌ Failed to list workers: {}", e),
     }
+    Ok(())
 }
 
 // ======== Job - worker assignment ==========
-pub async fn delete_assignment(assignment_id: i32) {
-    let mut c = load_db_connection().await;
+pub async fn delete_assignment(assignment_id: i32) -> anyhow::Result<(), anyhow::Error> {
+    let mut c = load_db_connection().await?;
 
     match JobAssignmentRepository::delete(&mut c, assignment_id).await {
         Ok(n) if n > 0 => println!("🗑️ Deleted assignment with ID {}", assignment_id),
         Ok(_) => println!("⚠️ No assignment found with ID {}", assignment_id),
         Err(e) => eprintln!("❌ Failed to delete assignment {}: {}", assignment_id, e),
     }
+    Ok(())
 }
 
-pub async fn assign_job_to_worker(job_id: i32, worker_id: i32) {
-    let mut c = load_db_connection().await;
+pub async fn assign_job_to_worker(
+    job_id: i32,
+    worker_id: i32,
+) -> anyhow::Result<(), anyhow::Error> {
+    let mut c = load_db_connection().await?;
 
     let new_assignment = NewJobAssignment { job_id, worker_id };
 
@@ -258,22 +300,23 @@ pub async fn assign_job_to_worker(job_id: i32, worker_id: i32) {
         ),
         Err(e) => eprintln!("❌ Failed to assign job: {}", e),
     }
+    Ok(())
 }
 
 pub async fn get_jobs_for_user(user_id: i32) -> Result<Vec<Job>, anyhow::Error> {
-    let mut c = load_db_connection().await;
+    let mut c = load_db_connection().await?;
     let jobs = JobRepository::list_by_admin(&mut c, user_id, 100, 0).await?;
     Ok(jobs)
 }
 
 pub async fn get_workers_for_user(user_id: i32) -> Result<Vec<Worker>, anyhow::Error> {
-    let mut c = load_db_connection().await;
+    let mut c = load_db_connection().await?;
     let workers = WorkerRepository::find_by_admin_id(&mut c, user_id).await?;
     Ok(workers)
 }
 
 pub async fn get_assignments_for_user(user_id: i32) -> Result<Vec<JobAssignment>, anyhow::Error> {
-    let mut c = load_db_connection().await;
+    let mut c = load_db_connection().await?;
 
     // Get jobs by user first
     let jobs = JobRepository::list_by_admin(&mut c, user_id, 100, 0).await?;
@@ -292,13 +335,17 @@ pub async fn get_assignments_for_user(user_id: i32) -> Result<Vec<JobAssignment>
 }
 
 pub async fn get_assignment_id_for_job(job_id: i32) -> anyhow::Result<Option<i32>> {
-    let mut conn = load_db_connection().await;
+    let mut conn = load_db_connection().await?;
     let assignments = JobAssignmentRepository::find_by_job_id(&mut conn, job_id).await?;
     Ok(assignments.first().map(|a| a.id))
 }
 
-pub async fn list_assignments_filtered(user_id: i32, job_id: Option<i32>, worker_id: Option<i32>) {
-    let mut c = load_db_connection().await;
+pub async fn list_assignments_filtered(
+    user_id: i32,
+    job_id: Option<i32>,
+    worker_id: Option<i32>,
+) -> anyhow::Result<(), anyhow::Error> {
+    let mut c = load_db_connection().await?;
 
     let jobs = JobRepository::list_by_admin(&mut c, user_id, 100, 0)
         .await
@@ -327,6 +374,8 @@ pub async fn list_assignments_filtered(user_id: i32, job_id: Option<i32>, worker
             );
         }
     }
+
+    Ok(())
 }
 
 // ======== LOGS =========
@@ -339,8 +388,8 @@ pub async fn create_log_entry(
     client_ip: Option<String>,
     client_username: Option<String>,
     custom_msg: Option<String>,
-) {
-    let mut conn = load_db_connection().await;
+) -> anyhow::Result<(), anyhow::Error> {
+    let mut conn = load_db_connection().await?;
     let new_entry = NewDBLogEntry {
         level,
         module,
@@ -360,27 +409,29 @@ pub async fn create_log_entry(
         Ok(log) => println!("✅ Created log entry with ID {}", log.id),
         Err(e) => eprintln!("❌ Failed to create log entry: {}", e),
     }
+    Ok(())
 }
 
 /// Fetch a log entry by its ID
-pub async fn get_log_by_id(id: i32) {
-    let mut conn = load_db_connection().await;
+pub async fn get_log_by_id(id: i32) -> anyhow::Result<(), anyhow::Error> {
+    let mut conn = load_db_connection().await?;
     match LogEntryRepository::find_by_id(&mut conn, id).await {
         Ok(log) => println!("📄 Log {}: {:?}", id, log),
         Err(e) => eprintln!("❌ Error fetching log {}: {}", id, e),
     }
+    Ok(())
 }
 
 /// Returns the log entry or an error.
 pub async fn fetch_log_entry(id: i32) -> Result<DBLogEntry, anyhow::Error> {
-    let mut conn = load_db_connection().await;
+    let mut conn = load_db_connection().await?;
     let entry = LogEntryRepository::find_by_id(&mut conn, id).await?;
     Ok(entry)
 }
 
 /// Fetch a page of *all* logs
 pub async fn fetch_logs(limit: i64, offset: i64) -> Result<Vec<DBLogEntry>, anyhow::Error> {
-    let mut conn = load_db_connection().await;
+    let mut conn = load_db_connection().await?;
     Ok(LogEntryRepository::list_all(&mut conn, limit, offset).await?)
 }
 
@@ -390,7 +441,7 @@ pub async fn fetch_logs_by_action(
     limit: i64,
     offset: i64,
 ) -> Result<Vec<DBLogEntry>, anyhow::Error> {
-    let mut conn = load_db_connection().await;
+    let mut conn = load_db_connection().await?;
     Ok(LogEntryRepository::list_by_action_exact(&mut conn, action, limit, offset).await?)
 }
 
@@ -400,7 +451,7 @@ pub async fn fetch_logs_by_level(
     limit: i64,
     offset: i64,
 ) -> Result<Vec<DBLogEntry>, anyhow::Error> {
-    let mut conn = load_db_connection().await;
+    let mut conn = load_db_connection().await?;
     Ok(LogEntryRepository::list_by_level_exact(&mut conn, level, limit, offset).await?)
 }
 
@@ -410,25 +461,27 @@ pub async fn fetch_logs_by_module(
     limit: i64,
     offset: i64,
 ) -> Result<Vec<DBLogEntry>, anyhow::Error> {
-    let mut conn = load_db_connection().await;
+    let mut conn = load_db_connection().await?;
     Ok(LogEntryRepository::find_logs_by_module(&mut conn, module, limit, offset).await?)
 }
 
 /// Update an existing log entry
-pub async fn update_log_entry(id: i32, updated: DBLogEntry) {
-    let mut conn = load_db_connection().await;
+pub async fn update_log_entry(id: i32, updated: DBLogEntry) -> anyhow::Result<(), anyhow::Error> {
+    let mut conn = load_db_connection().await?;
     match LogEntryRepository::update(&mut conn, id, updated).await {
         Ok(log) => println!("✏️ Updated log {}: {:?}", id, log),
         Err(e) => eprintln!("❌ Failed to update log {}: {}", id, e),
     }
+    Ok(())
 }
 
 /// Delete a log entry by ID
-pub async fn delete_log_entry(id: i32) {
-    let mut conn = load_db_connection().await;
+pub async fn delete_log_entry(id: i32) -> anyhow::Result<(), anyhow::Error> {
+    let mut conn = load_db_connection().await?;
     match LogEntryRepository::delete(&mut conn, id).await {
         Ok(n) if n > 0 => println!("🗑️ Deleted log entry {}", id),
         Ok(_) => println!("⚠️ No log found with ID {}", id),
         Err(e) => eprintln!("❌ Error deleting log {}: {}", id, e),
     }
+    Ok(())
 }

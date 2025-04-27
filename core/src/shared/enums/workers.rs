@@ -17,14 +17,15 @@ pub enum WorkerStatusEnum {
     Unreachable,
 }
 
-impl ToString for WorkerStatusEnum {
-    fn to_string(&self) -> String {
-        match self {
-            WorkerStatusEnum::Idle => String::from("Idle"),
-            WorkerStatusEnum::Busy => String::from("Busy"),
-            WorkerStatusEnum::Offline => String::from("Offline"),
-            WorkerStatusEnum::Unreachable => String::from("Unreachable"),
-        }
+impl fmt::Display for WorkerStatusEnum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            WorkerStatusEnum::Idle => "Idle",
+            WorkerStatusEnum::Busy => "Busy",
+            WorkerStatusEnum::Offline => "Offline",
+            WorkerStatusEnum::Unreachable => "Unreachable",
+        };
+        write!(f, "{}", s)
     }
 }
 
@@ -78,6 +79,18 @@ pub enum OSEnum {
     Any,
 }
 
+impl fmt::Display for OSEnum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            OSEnum::Linux => "Linux",
+            OSEnum::Windows => "Windows",
+            OSEnum::MacOSEnum => "MacOS",
+            OSEnum::Any => "Any",
+        };
+        write!(f, "{}", s)
+    }
+}
+
 impl FromStr for OSEnum {
     type Err = ();
 
@@ -116,17 +129,5 @@ impl ToSql<Text, Pg> for OSEnum {
             OSEnum::Any => out.write_all(b"Any")?,
         }
         Ok(diesel::serialize::IsNull::No)
-    }
-}
-
-impl fmt::Display for OSEnum {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
-            OSEnum::Linux => "Linux",
-            OSEnum::Windows => "Windows",
-            OSEnum::MacOSEnum => "MacOS",
-            OSEnum::Any => "Any",
-        };
-        write!(f, "{}", s)
     }
 }

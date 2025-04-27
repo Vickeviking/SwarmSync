@@ -15,13 +15,14 @@ pub enum CoreEvent {
     Restart,
 }
 
-impl ToString for CoreEvent {
-    fn to_string(&self) -> String {
-        match self {
-            CoreEvent::Startup => "Startup".to_string(),
-            CoreEvent::Shutdown => "Shutdown".to_string(),
-            CoreEvent::Restart => "Restart".to_string(),
-        }
+impl fmt::Display for CoreEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            CoreEvent::Startup => "Startup",
+            CoreEvent::Shutdown => "Shutdown",
+            CoreEvent::Restart => "Restart",
+        };
+        write!(f, "{}", name)
     }
 }
 
@@ -45,13 +46,14 @@ pub enum Pulse {
     Fast,   // 50ms
 }
 
-impl ToString for Pulse {
-    fn to_string(&self) -> String {
-        match self {
-            Pulse::Slow => "Slow".to_string(),
-            Pulse::Medium => "Medium".to_string(),
-            Pulse::Fast => "Fast".to_string(),
-        }
+impl fmt::Display for Pulse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Pulse::Slow => "Slow",
+            Pulse::Medium => "Medium",
+            Pulse::Fast => "Fast",
+        };
+        write!(f, "{}", s)
     }
 }
 
@@ -101,7 +103,7 @@ impl From<usize> for SystemModuleEnum {
             3 => SystemModuleEnum::Receiver,
             4 => SystemModuleEnum::Scheduler,
             5 => SystemModuleEnum::TaskArchive,
-            _ => panic!("invalid SystemModuleEnum variant index"),
+            _ => SystemModuleEnum::Dispatcher,
         }
     }
 }

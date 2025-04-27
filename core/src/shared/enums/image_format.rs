@@ -1,12 +1,13 @@
+use std::fmt;
 use std::io::Write;
 use std::str::FromStr;
 
 use diesel::deserialize::FromSql;
+use diesel::deserialize::FromSqlRow;
 use diesel::expression::AsExpression;
 use diesel::pg::{Pg, PgValue};
 use diesel::serialize::ToSql;
 use diesel::sql_types::Text;
-use diesel::deserialize::FromSqlRow;
 use serde::{Deserialize, Serialize};
 
 #[derive(AsExpression, FromSqlRow, Debug, Deserialize, Serialize, PartialEq)]
@@ -16,12 +17,13 @@ pub enum ImageFormatEnum {
     DockerRegistry,
 }
 
-impl ToString for ImageFormatEnum {
-    fn to_string(&self) -> String {
-        match self {
-            ImageFormatEnum::Tarball => "Tarball".to_string(),
-            ImageFormatEnum::DockerRegistry => "DockerRegistry".to_string(),
-        }
+impl fmt::Display for ImageFormatEnum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            ImageFormatEnum::Tarball => "Tarball",
+            ImageFormatEnum::DockerRegistry => "DockerRegistry",
+        };
+        write!(f, "{}", label)
     }
 }
 

@@ -19,7 +19,7 @@ use crate::cli::utils::{self, SelectMenuResult};
 use crate::commands;
 use crate::database::models::{job::Job, job::JobAssignment, worker::Worker};
 use crate::shared::enums::job::JobStateEnum;
-use anyhow::{Context, Result};
+use anyhow::Context;
 
 pub async fn inspect() -> anyhow::Result<()> {
     let user_id_menu_result: SelectMenuResult = utils::select_user()

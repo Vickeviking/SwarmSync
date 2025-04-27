@@ -10,12 +10,15 @@ use tokio::sync::Mutex;
 
 fn main() {
     let runtime = Runtime::new().unwrap();
-    runtime.block_on(async {
-        tokio_async_runtime().await;
-    });
+    let res = runtime.block_on(async { tokio_async_runtime().await });
+    // Pretty print anyhow errors
+    if let Err(err) = res {
+        eprintln!("{:#}", err);
+        std::process::exit(1);
+    }
 }
 
-async fn tokio_async_runtime() {
+async fn tokio_async_runtime() -> anyhow::Result<(), anyhow::Error> {
     // Initialize necessary components
     let service_channels = Arc::new(ServiceChannels::new());
     let service_wiring = Arc::new(Mutex::new(ServiceWiring::new()));
@@ -35,8 +38,7 @@ async fn tokio_async_runtime() {
     let initializer =
         ServiceInitializer::new(Arc::clone(&shared_resources), pulse_broadcaster).await;
     let shutdown_notify = initializer.shutdown_notify.clone();
-    initializer.start();
-
+    let _ = initializer.start()?;
     // ==== create and start modules ====
     let service_handles = ModuleInitializer::new(Arc::clone(&shared_resources));
 
@@ -54,4 +56,6 @@ async fn tokio_async_runtime() {
         .await;
     service_handles.join_tasks().await;
     println!("Shutdown complete.");
+
+    Ok(())
 }

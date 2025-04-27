@@ -1,6 +1,6 @@
 // src/cli/views/jobs.rs
 use crate::cli::utils::{
-    move_job_state, select_assignment, select_job, select_job_with_any, select_user, select_worker,
+    move_job_state, select_assignment, select_job, select_job_with_any, select_user,
     select_worker_with_any, SelectMenuResult,
 };
 use crate::commands;
@@ -55,7 +55,7 @@ async fn job_crud() -> anyhow::Result<()> {
 
         match choice {
             0 => break,
-            1 => commands::list_jobs_by_user(user_id).await,
+            1 => commands::list_jobs_by_user(user_id).await?,
             2 => {
                 let job_name: String = Input::with_theme(&ColorfulTheme::default())
                     .with_prompt("Job name")
@@ -126,19 +126,19 @@ async fn job_crud() -> anyhow::Result<()> {
                     schedule_type,
                     cron_expression,
                 )
-                .await;
+                .await?;
             }
             3 => {
-                let job_id_menu_result: SelectMenuResult = select_job(user_id).await.unwrap();
+                let job_id_menu_result: SelectMenuResult = select_job(user_id).await?;
                 let job_id = match job_id_menu_result {
                     SelectMenuResult::Back => return Ok(()),
                     SelectMenuResult::Chosen(id) => id,
                 };
 
-                commands::remove_job(job_id).await;
+                commands::remove_job(job_id).await?;
             }
             4 => {
-                let job_id_menu_result: SelectMenuResult = select_job(user_id).await.unwrap();
+                let job_id_menu_result: SelectMenuResult = select_job(user_id).await?;
                 let job_id = match job_id_menu_result {
                     SelectMenuResult::Back => return Ok(()),
                     SelectMenuResult::Chosen(id) => id,
@@ -179,12 +179,12 @@ async fn worker_crud() -> anyhow::Result<()> {
 
         match choice {
             0 => break,
-            1 => commands::list_workers_by_user(user_id, 10, 0).await,
+            1 => commands::list_workers_by_user(user_id, 10, 0).await?,
             2 => {
                 let label: String = Input::with_theme(&ColorfulTheme::default())
                     .with_prompt("Worker label")
                     .interact_text()?;
-                commands::create_worker(user_id, label).await;
+                commands::create_worker(user_id, label).await?;
             }
             3 => {
                 let id: i32 = Input::with_theme(&ColorfulTheme::default())
@@ -193,13 +193,13 @@ async fn worker_crud() -> anyhow::Result<()> {
                 let label: String = Input::with_theme(&ColorfulTheme::default())
                     .with_prompt("New Label")
                     .interact_text()?;
-                commands::update_worker(id, label).await;
+                commands::update_worker(id, label).await?;
             }
             4 => {
                 let id: i32 = Input::with_theme(&ColorfulTheme::default())
                     .with_prompt("Worker ID")
                     .interact_text()?;
-                commands::delete_worker(id).await;
+                commands::delete_worker(id).await?;
             }
             _ => unreachable!(),
         }
@@ -249,11 +249,18 @@ async fn assign_job() -> anyhow::Result<()> {
                     SelectMenuResult::Back => return Ok(()),
                     SelectMenuResult::Chosen(id) => id,
                 };
-                commands::assign_job_to_worker(job_id, worker_id).await;
+                commands::assign_job_to_worker(job_id, worker_id).await?;
             }
             2 => {
-                let assignment_id: i32 = select_assignment().await.unwrap();
-                commands::delete_assignment(assignment_id).await;
+                let assignment_id_menu_result: SelectMenuResult = select_assignment()
+                    .await
+                    .context("Could not select assignment through TUI function under utils")?;
+
+                let assignment_id = match assignment_id_menu_result {
+                    SelectMenuResult::Back => return Ok(()),
+                    SelectMenuResult::Chosen(id) => id,
+                };
+                commands::delete_assignment(assignment_id).await?;
             }
             3 => {
                 let user_id_menu_result: SelectMenuResult = select_user()
@@ -267,7 +274,7 @@ async fn assign_job() -> anyhow::Result<()> {
                 let job_id: Option<i32> = select_job_with_any(user_id).await.unwrap_or(None);
                 let worker_id: Option<i32> = select_worker_with_any(user_id).await.unwrap_or(None);
 
-                commands::list_assignments_filtered(user_id, job_id, worker_id).await;
+                commands::list_assignments_filtered(user_id, job_id, worker_id).await?;
             }
             _ => unreachable!(),
         }

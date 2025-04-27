@@ -1,5 +1,5 @@
 use crate::{
-    cli::utils::{self, select_user, SelectMenuResult},
+    cli::utils::{self, SelectMenuResult},
     commands,
 };
 use anyhow::{Context, Result};
@@ -40,7 +40,7 @@ async fn list_users() -> anyhow::Result<()> {
     let limit: i64 = 10;
 
     loop {
-        commands::list_users(limit, offset).await;
+        commands::list_users(limit, offset).await?;
 
         let actions = vec!["Back", "Next Page", "Previous Page"];
         let choice = Select::with_theme(&ColorfulTheme::default())
@@ -71,7 +71,7 @@ async fn create_user() -> anyhow::Result<()> {
         .with_prompt("Password")
         .interact_text()?;
 
-    commands::create_user(username, email, password).await;
+    commands::create_user(username, email, password).await?;
     Ok(())
 }
 
@@ -94,7 +94,7 @@ async fn update_user() -> anyhow::Result<()> {
         .with_prompt("New Password")
         .interact_text()?;
 
-    commands::update_user(user_id, username, email, password).await;
+    commands::update_user(user_id, username, email, password).await?;
     Ok(())
 }
 
@@ -108,7 +108,7 @@ async fn delete_user() -> anyhow::Result<()> {
         SelectMenuResult::Chosen(id) => id,
     };
 
-    commands::delete_user(user_id).await;
+    commands::delete_user(user_id).await?;
     Ok(())
 }
 
@@ -139,6 +139,6 @@ async fn delete_many_users() -> Result<()> {
         return Ok(());
     };
 
-    commands::delete_many_users(start_id, end_id).await;
+    commands::delete_many_users(start_id, end_id).await?;
     Ok(())
 }

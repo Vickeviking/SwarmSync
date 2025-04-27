@@ -8,6 +8,7 @@ use std::env;
 use std::sync::Arc;
 use tokio::sync::broadcast::error::RecvError;
 
+#[allow(clippy::expect_used)]
 pub async fn build_rocket(shared: Arc<SharedResources>) -> Rocket<Build> {
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let redis_url = env::var("REDIS_URL").expect("REDIS URL must be set");
@@ -36,6 +37,7 @@ fn index() -> &'static str {
     "SwarmSync is live."
 }
 
+#[allow(clippy::unwrap_used)]
 pub async fn launch_rocket(shared: Arc<SharedResources>) {
     let mut shutdown_rx = shared.get_service_channels().subscribe_to_core_event();
 

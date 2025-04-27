@@ -67,16 +67,20 @@ services:
     image: alpine:3.17
     container_name: swarmsync-db-backup
     depends_on:
-      - postgres # ensure DB is up before backup service starts
+      - postgres
     environment:
-      - PGPASSWORD=postgres # allow pg_dump to auth without prompt
+      - PGPASSWORD=postgres
     volumes:
-      - ./backups:/backups # mount host directory for storing snapshots
-    # Cron job: every 10 minutes dump the database to a timestamped file
+      - ./backups:/backups
     command: >
-      sh -c "apk add --no-cache postgresql-client &&
-             echo '*/10 * * * * pg_dump -h postgres -U postgres app_db > /backups/backup_$(date +\%Y\%m\%d_\%H\%M\%S).sql' > /etc/crontabs/root &&
-             crond -f"
+      sh -c "
+        apk add --no-cache postgresql-client findutils &&
+        # Dump every 8 hours at minute 0 (00:00, 08:00, 16:00)
+        echo '0 */8 * * * pg_dump -h postgres -U postgres app_db > /backups/backup_$(date +\%Y\%m\%d_\%H\%M\%S).sql' > /etc/crontabs/root &&
+        # Cleanup daily at 00:05 of files older than 7 days
+        echo '5 0 * * * find /backups -type f -mtime +7 -delete' >> /etc/crontabs/root &&
+        crond -f
+      "
     # The above installs the Postgres client and writes a cron entry that runs pg_dump.
     # Snapshots (SQL dumps) will accumulate in the ./backups folder for review or restoration.
 

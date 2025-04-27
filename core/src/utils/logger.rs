@@ -60,6 +60,7 @@ impl Logger {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn log(
         logger: Arc<Logger>,
         log_level: LogLevelEnum,
@@ -118,7 +119,6 @@ impl Logger {
 
 #[cfg(test)]
 mod tests {
-    
 
     #[tokio::test]
     async fn test_logger_initialization() {

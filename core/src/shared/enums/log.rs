@@ -32,7 +32,7 @@ impl From<usize> for LogLevelEnum {
             2 => LogLevelEnum::Warning,
             3 => LogLevelEnum::Error,
             4 => LogLevelEnum::Fatal,
-            _ => panic!("invalid LogLevelEnum variant index"),
+            _ => LogLevelEnum::Info,
         }
     }
 }
@@ -112,7 +112,7 @@ impl From<usize> for LogActionEnum {
             3 => LogActionEnum::SystemStarted,
             4 => LogActionEnum::SystemShutdown,
             5 => LogActionEnum::Custom,
-            _ => panic!("invalid LogActionEnum variant index"),
+            _ => LogActionEnum::Custom,
         }
     }
 }
