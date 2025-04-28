@@ -1,5 +1,4 @@
 services:
-  # PostgreSQL database service (only needed for Core)
   postgres:
     image: postgres:15-alpine
     container_name: swarmsync-db
@@ -10,59 +9,74 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  # Redis in-memory datastore (only needed for Core)
   redis:
     image: redis:7-alpine
     container_name: swarmsync-redis
-    # Redis data is ephemeral for development (no persistent volume)
 
-  # Core service (Rust backend API + engine)
   core:
-    build: ./core
+    build: ./swarm_core
     container_name: swarmsync-core
     environment:
       - DATABASE_URL=postgres://postgres:postgres@postgres:5432/app_db
       - REDIS_URL=redis://redis:6379
     depends_on:
-      - postgres # Ensure DB and cache start before core
+      - postgres
       - redis
     ports:
-      - "8000:8000" # expose core API port
+      - "8000:8000" # Core HTTP
+      - "5001:5001/udp" # Core UDP heartbeat
     volumes:
-      - ./core:/app # mount source code for live development
-    # No profile: core runs by default on `docker compose up`
-    entrypoint: ["tail", "-f", "/dev/null"] # keep container running for exec
+      - ./swarm_core:/app
+    entrypoint: ["tail", "-f", "/dev/null"]
 
-  # Consumer CLI service (Rust CLI for end-users)
   consumer:
     build:
-      context: ./consumer
+      context: ./swarm_consumer
       dockerfile: Dockerfile
-      target: builder # use builder stage so Rust toolchain is present
+      target: builder
     container_name: swarmsync-consumer
-    working_dir: /usr/src/consumer
+    working_dir: /usr/src/swarm_consumer
     volumes:
-      - ./consumer:/usr/src/consumer # mount source for dev
-    entrypoint: ["tail", "-f", "/dev/null"] # keep container alive (idle)
-    profiles: ["cli"] # only start when profile 'cli' is enabled or explicitly requested
+      - ./swarm_consumer:/usr/src/swarm_consumer
+    entrypoint: ["tail", "-f", "/dev/null"]
+    profiles: ["cli"]
     environment:
       - CORE_API_URL=http://core:8000
 
-  # (Optional) Consumer test runner service
-  consumer-test:
+  swarm-worker:
     build:
-      context: ./consumer
+      context: ./swarm_worker/swarm-worker
       dockerfile: Dockerfile
-      target: builder
-    container_name: swarmsync-consumer-test
-    working_dir: /usr/src/consumer
+    container_name: swarmsync-worker
+    depends_on:
+      - core
+    environment:
+      - CORE_API_URL=http://core:8000
+      - WORKER_CONFIG_PATH=/worker/worker_config.json
+      - DOCKER_HOST=unix:///var/run/docker.sock
     volumes:
-      - ./consumer:/usr/src/consumer
-    entrypoint: ["cargo"]
-    command: ["test"] # runs tests, then exits
-    profiles: ["cli"] # also under 'cli' profile (run on demand)
+      - ./swarm_worker/swarm-worker-common/worker_config.json:/worker/worker_config.json:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: ["swarm-worker", "--config", "/worker/worker_config.json"]
 
-  # Backup service for periodic DB snapshots
+  swarm-worker-tui:
+    build:
+      context: ./swarm_worker/swarm-worker-tui
+      dockerfile: Dockerfile
+    container_name: swarmsync-worker-tui
+    depends_on:
+      - core
+      - swarm-worker
+    environment:
+      - CORE_API_URL=http://core:8000
+      - WORKER_CONFIG_PATH=/tui/worker_config.json
+    volumes:
+      - ./swarm_worker/swarm-worker-common/worker_config.json:/tui/worker_config.json
+      - /var/run/docker.sock:/var/run/docker.sock
+    stdin_open: true
+    tty: true
+    entrypoint: ["swarm-worker-tui"]
+
   db_backup:
     image: alpine:3.17
     container_name: swarmsync-db-backup
@@ -75,14 +89,10 @@ services:
     command: >
       sh -c "
         apk add --no-cache postgresql-client findutils &&
-        # Dump every 8 hours at minute 0 (00:00, 08:00, 16:00)
         echo '0 */8 * * * pg_dump -h postgres -U postgres app_db > /backups/backup_$(date +\%Y\%m\%d_\%H\%M\%S).sql' > /etc/crontabs/root &&
-        # Cleanup daily at 00:05 of files older than 7 days
         echo '5 0 * * * find /backups -type f -mtime +7 -delete' >> /etc/crontabs/root &&
         crond -f
       "
-    # The above installs the Postgres client and writes a cron entry that runs pg_dump.
-    # Snapshots (SQL dumps) will accumulate in the ./backups folder for review or restoration.
 
 volumes:
-  postgres_data: {} # Named volume for Postgres data (local, unique per project clone)
+  postgres_data: {}

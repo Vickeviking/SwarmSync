@@ -1,65 +1,85 @@
-# Top-level Makefile for SwarmSync
-
-# Default target: show help
-.PHONY: help
-help:
-	@echo "SwarmSync Makefile - available targets:"
-	@awk '/^[a-zA-Z\-\_]+:/{print "  " $$1}' $(MAKEFILE_LIST)
-
-# Build Docker images for core and consumer
+# Build everything
 .PHONY: build
 build:
-	docker compose build core consumer
+	docker compose build core consumer swarm-worker swarm-worker-tui
 
-# Run services
-.PHONY: up-core up-consumer up-all down
+# Start Core (and DB backup)
+.PHONY: up-core
 up-core:
-	@echo "Starting Core module (and dependencies)..."
-	docker compose up -d core db_backup  # core depends on postgres & redis; include backup
+	@echo "Starting Core + DB backup..."
+	docker compose up -d core db_backup
+
+# Start Consumer CLI
+.PHONY: up-consumer
 up-consumer:
-	@echo "Starting Consumer CLI module..."
+	@echo "Starting Consumer CLI..."
 	docker compose up -d consumer
+
+# Start Worker
+.PHONY: up-worker
+up-worker:
+	@echo "Starting Swarm Worker (headless)..."
+	docker compose up -d swarm-worker
+
+# Run Worker-TUI interactively
+.PHONY: up-worker-tui
+up-worker-tui:
+	@echo "Launching Swarm Worker TUI..."
+	docker compose run --rm swarm-worker-tui
+
+# Start everything
+.PHONY: up-all
 up-all:
-	@echo "Starting Core + Consumer + dependencies..."
-	docker compose up -d core db_backup consumer
+	@echo "Starting Core, Consumer, Worker, and dependencies..."
+	docker compose up -d core db_backup consumer swarm-worker
+
+# Stop all containers
+.PHONY: down
 down:
 	@echo "Stopping all SwarmSync containers..."
 	docker compose down
 
-# Database migrations (run Diesel migrations inside core container)
+# Migrate DB
 .PHONY: migrate
-migrate: up-core   # ensure core (and DB) is up
+migrate: up-core
 	@echo "Running database migrations..."
 	docker compose exec core diesel migration run
 
-# Manual database backup and restore
+# Save/restore DB
 .PHONY: db-save db-load
-db-save: 
-	@echo "Saving database snapshot to backups/manual_backup.sql..."
-	# Dump the 'app_db' database to a SQL file
+db-save:
+	@echo "Dumping DB to backups/manual_backup.sql..."
 	docker compose exec -T postgres pg_dump -U postgres app_db > backups/manual_backup.sql
-	@echo "Database saved to backups/manual_backup.sql"
-db-load: 
-	@echo "Restoring database from backups/manual_backup.sql..."
-	# Restore the database from the SQL dump
+db-load:
+	@echo "Restoring DB from backups/manual_backup.sql..."
 	cat backups/manual_backup.sql | docker compose exec -T postgres psql -U postgres -d app_db
-	@echo "Database restored from backups/manual_backup.sql"
 
-# Run tests in both modules
+# Test both Core and Consumer
 .PHONY: test
-test: 
-	@echo "Running cargo test in core/ and consumer/..."
+test:
+	@echo "Running tests in Core and Consumer..."
 	docker compose exec core cargo test
 	docker compose exec consumer cargo test
 
-# Run/attach to the main binaries (for convenience)
-.PHONY: run-core run-consumer run-commanddeck
+# Convenience run targets
+.PHONY: run-core run-consumer run-worker run-worker-tui run-commanddeck
 run-core: up-core migrate
-	@echo "Launching Core service (API & engine)..."
+	@echo "Launching Core service..."
 	docker compose exec core cargo run --bin core
-run-consumer: up-consumer 
-	@echo "Launching Consumer CLI (interactive)..."
+
+run-consumer: up-consumer
+	@echo "Launching Consumer CLI..."
 	docker compose exec consumer cargo run
-run-commanddeck: up-core 
-	@echo "Launching CommandDeck TUI (core admin CLI)..."
+
+run-worker: up-core up-worker
+	@echo "Launching Swarm Worker (headless)..."
+	docker compose exec swarm-worker swarm-worker --config /worker/worker_config.json
+
+run-worker-tui: up-core up-worker
+	@echo "Launching Swarm Worker TUI..."
+	docker compose exec swarm-worker-tui swarm-worker-tui --config /tui/worker_config.json
+
+run-commanddeck: up-core
+	@echo "Launching CommandDeck TUI..."
 	docker compose exec core cargo run --bin commanddeck
+
