@@ -1,0 +1,22 @@
+[package]
+name = "swarm-worker-tui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio          = { workspace = true }
+reqwest        = { workspace = true }
+anyhow         = { workspace = true }
+serde          = { workspace = true }
+serde_json     = { workspace = true }
+chrono         = { workspace = true }
+once_cell      = { workspace = true }
+dialoguer      = { workspace = true }
+lsp_doc_stable = { workspace = true }
+swarm-worker-common = { path = "../swarm-worker-common" }
+
+lazy_static = "1.4"
+anyhow       = "1.0"
+clap         = { version = "4.0", features = ["derive"] }
+signal-hook  = "0.3"
+wait-timeout = "0.2"
