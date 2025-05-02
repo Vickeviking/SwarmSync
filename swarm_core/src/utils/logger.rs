@@ -9,6 +9,7 @@ use std::sync::Arc;
 use tokio::select;
 use tokio::sync::{broadcast::Receiver, Mutex, RwLock};
 
+/// All modules access logger via
 pub struct Logger {
     buffer_logs: RwLock<Vec<LogEntry>>, // sent to db on pulse, on convertion use NewDBLogEntry
     core_event_rx: Mutex<Receiver<CoreEvent>>,

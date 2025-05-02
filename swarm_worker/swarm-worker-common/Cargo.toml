@@ -1,0 +1,15 @@
+[package]
+name = "swarm-worker-common"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio          = { workspace = true }
+reqwest        = { workspace = true }
+anyhow         = { workspace = true }
+serde          = { workspace = true }
+serde_json     = { workspace = true }
+chrono         = { workspace = true }
+once_cell      = { workspace = true }
+dialoguer      = { workspace = true }
+lsp_doc_stable = { workspace = true } 
