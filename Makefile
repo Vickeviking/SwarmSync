@@ -1,85 +1,138 @@
-# Build everything
-.PHONY: build
-build:
-	docker compose build core consumer swarm-worker swarm-worker-tui
+###############################################################################
+# Makefile with help and interactive menu
+###############################################################################
 
-# Start Core (and DB backup)
-.PHONY: up-core
-up-core:
+# Detect current Makefile
+FILE := $(firstword $(MAKEFILE_LIST))
+
+.PHONY: build up-core up-consumer up-all down migrate db-save db-load db_store docker-clean \
+        test run-core run-consumer run-worker-tui run-commanddeck help menu \
+        build-worker up-worker run-worker
+
+# Build everything                         ## build: build core, consumer, and swarm-worker
+build: ## Build core, consumer, and swarm-worker
+	docker compose build core consumer swarm-worker
+
+# Start Core (and DB backup)               ## up-core: start core and db_backup
+up-core: ## Start Core service and DB backup
 	@echo "Starting Core + DB backup..."
 	docker compose up -d core db_backup
 
-# Start Consumer CLI
-.PHONY: up-consumer
-up-consumer:
+# Start Consumer CLI                       ## up-consumer: start consumer CLI
+up-consumer: ## Start Consumer CLI
 	@echo "Starting Consumer CLI..."
 	docker compose up -d consumer
 
-# Start Worker
-.PHONY: up-worker
-up-worker:
-	@echo "Starting Swarm Worker (headless)..."
-	docker compose up -d swarm-worker
+# Start Swarm Worker container             ## up-worker: start Swarm Worker service
+up-worker: ## Start Swarm Worker service
+	@echo "Starting Swarm Worker..."
+	@docker compose up -d swarm-worker
 
-# Run Worker-TUI interactively
-.PHONY: up-worker-tui
-up-worker-tui:
-	@echo "Launching Swarm Worker TUI..."
-	docker compose run --rm swarm-worker-tui
-
-# Start everything
-.PHONY: up-all
-up-all:
+# Start everything                         ## up-all: start all services and dependencies
+up-all: ## Start Core, Consumer, Worker, and dependencies
 	@echo "Starting Core, Consumer, Worker, and dependencies..."
 	docker compose up -d core db_backup consumer swarm-worker
 
-# Stop all containers
-.PHONY: down
-down:
+# Stop all containers                      ## down: stop all SwarmSync containers
+down: ## Stop all SwarmSync containers
 	@echo "Stopping all SwarmSync containers..."
-	docker compose down
+	@docker compose down
 
-# Migrate DB
-.PHONY: migrate
-migrate: up-core
+# Migrate DB                                ## migrate: run database migrations
+migrate: up-core ## Run database migrations (requires core up)
 	@echo "Running database migrations..."
-	docker compose exec core diesel migration run
+	@docker compose exec -T core diesel migration run
 
-# Save/restore DB
-.PHONY: db-save db-load
-db-save:
+# Save DB to SQL dump                       ## db-save: dump DB to SQL file
+db-save: ## Dump DB to backups/manual_backup.sql
 	@echo "Dumping DB to backups/manual_backup.sql..."
-	docker compose exec -T postgres pg_dump -U postgres app_db > backups/manual_backup.sql
-db-load:
+	@docker compose exec -T postgres pg_dump -U postgres app_db > backups/manual_backup.sql
+
+# Alias for db-save                         ## db_store: alias for db-save
+db_store: db-save
+
+# Load DB from SQL dump                     ## db-load: restore DB from SQL file
+db-load: ## Restore DB from backups/manual_backup.sql
 	@echo "Restoring DB from backups/manual_backup.sql..."
-	cat backups/manual_backup.sql | docker compose exec -T postgres psql -U postgres -d app_db
+	@cat backups/manual_backup.sql | docker compose exec -T postgres psql -U postgres -d app_db
 
-# Test both Core and Consumer
-.PHONY: test
-test:
+# Run tests                                 ## test: run tests in Core and Consumer
+test: ## Run tests in Core and Consumer
 	@echo "Running tests in Core and Consumer..."
-	docker compose exec core cargo test
-	docker compose exec consumer cargo test
+	@docker compose exec core cargo test
+	@docker compose exec consumer cargo test
 
-# Convenience run targets
-.PHONY: run-core run-consumer run-worker run-worker-tui run-commanddeck
-run-core: up-core migrate
+# Convenience run targets                   ## run-core: run core service
+run-core: up-core migrate ## Launch Core service
 	@echo "Launching Core service..."
-	docker compose exec core cargo run --bin core
+	@docker compose exec -T core cargo run --bin core
 
-run-consumer: up-consumer
+# Launch Consumer CLI                        ## run-consumer: run consumer CLI
+run-consumer: up-consumer ## Launch Consumer CLI
 	@echo "Launching Consumer CLI..."
-	docker compose exec consumer cargo run
+	@docker compose exec consumer cargo run
 
-run-worker: up-core up-worker
-	@echo "Launching Swarm Worker (headless)..."
-	docker compose exec swarm-worker swarm-worker --config /worker/worker_config.json
+run-worker-tui-rebuild: rebuild-worker up-worker  ## Launch the TUI (with backtraces enabled)
+	@echo "Launching Swarm Worker TUI…"
+	docker compose exec \
+	  -e RUST_BACKTRACE=1 \
+	  swarm-worker \
+	  swarm-worker-tui
 
-run-worker-tui: up-core up-worker
-	@echo "Launching Swarm Worker TUI..."
-	docker compose exec swarm-worker-tui swarm-worker-tui --config /tui/worker_config.json
+run-worker-tui: up-worker  ## Launch the TUI (with backtraces enabled)
+	@echo "Launching Swarm Worker TUI…"
+	docker compose exec \
+	  -e RUST_BACKTRACE=1 \
+	  swarm-worker \
+	  swarm-worker-tui
 
-run-commanddeck: up-core
+# Build only the worker image
+build-worker: ## Build just swarm-worker
+	docker compose build swarm-worker
+
+# Rebuild (no cache) and restart worker only
+rebuild-worker: ## Rebuild swarm-worker from scratch and restart it
+	docker compose build --no-cache swarm-worker
+	docker compose up -d --no-deps swarm-worker
+
+# Launch CommandDeck TUI                     ## run-commanddeck: launch CommandDeck TUI
+run-commanddeck: up-core ## Launch CommandDeck TUI
 	@echo "Launching CommandDeck TUI..."
-	docker compose exec core cargo run --bin commanddeck
+	@docker compose exec core cargo run --bin commanddeck
+
+# Help                                      ## help: show help message
+help: ## Show help for all Makefile targets
+	@echo "Usage: make [target]"
+	@echo ""
+	@echo "Available targets:"
+	@grep -E '^[a-zA-Z0-9_-]+:.*?##' $(FILE) \
+		| sort \
+		| awk -F ':.*?## ' '{printf "  %-20s %s\n", $$1, $$2}'
+
+# Interactive menu                          ## menu: choose a target interactively
+menu: help ## Interactive menu to select a target
+	@echo ""
+	@echo "Select a target to run:"
+	@grep -E '^[a-zA-Z0-9_-]+:.*?##' $(FILE) \
+		| sort \
+		| awk -F ':.*?## ' '{print NR ") " $$1 " - " $$2}' \
+		| tee /dev/tty \
+		| { read -p "Enter number: " num </dev/tty; \
+		    echo ""; \
+		    cmd=$$(grep -E '^[a-zA-Z0-9_-]+:.*?##' $(FILE) \
+		           | sort \
+		           | sed -n "$$num p" \
+		           | awk -F ':.*?## ' '{print $$1}'); \
+		    echo "Running $$cmd..."; \
+		    make $$cmd; \
+		  }
+
+# Docker-clean                             ## docker-clean: snapshot DB, stop and prune Docker
+docker-clean: db_store down ## Snapshot DB, stop services, then prune Docker
+	@echo "Pruning Docker system (containers, images, volumes...)"
+	@docker system prune -af --volumes
+
+
+
+
 

@@ -1,16 +1,12 @@
 use dialoguer::{theme::ColorfulTheme, Input, Select};
-use reqwest;
-use serde::{Deserialize, Serialize};
-use std::fs;
-use std::path::PathBuf;
-use swarm_worker_common::config::{self, config_file_path, CoreConfig};
+use swarm_worker_common::config::{self, CoreConfig};
 use swarm_worker_common::net::is_reachable;
 
 /// Ask the user where Swarm-Sync Core is running and persist the answer.
 /// If a saved config exists and is reachable, offer to reuse it.
 pub async fn choose_core_location() -> anyhow::Result<String> {
     // ── 1. Check existing config ──────────────────────────────────
-    let cfg: CoreConfig = config::get_core_config()?;
+    let cfg: CoreConfig = config::load_core_config()?;
     // Offer reuse
     let items = &[
         format!("Use saved ({})", cfg.base_url),
@@ -62,6 +58,8 @@ pub async fn choose_core_location() -> anyhow::Result<String> {
     let cfg = CoreConfig {
         base_url: base_url.clone(),
         last_username: None, // will be filled after successful auth
+        worker_status_enum: None,
+        worker_id: None,
     };
     config::save_core_config(&cfg);
     Ok(base_url)

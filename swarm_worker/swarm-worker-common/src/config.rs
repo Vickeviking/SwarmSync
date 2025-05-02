@@ -2,8 +2,9 @@ use crate::commands;
 
 use super::model::WorkerStatusEnum;
 use super::net::Session;
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
+use std::env;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
@@ -13,13 +14,26 @@ use std::path::PathBuf;
 pub struct CoreConfig {
     pub base_url: String,
     pub last_username: Option<String>,
-    pub worker_status_enum: WorkerStatusEnum,
-    pub worker_id: i32,
+    pub worker_status_enum: Option<WorkerStatusEnum>,
+    pub worker_id: Option<i32>,
 }
 
 /// Absolute path of the config file (working directory).
 pub fn config_file_path() -> PathBuf {
-    PathBuf::from("worker_config.json")
+    // 1) ENV override (container will always have this set)
+    if let Ok(path) = env::var("WORKER_CONFIG_PATH") {
+        return PathBuf::from(path);
+    }
+
+    // 2) Fallback for local dev:
+    //    CARGO_MANIFEST_DIR points to the current crate (swarm-worker-tui)
+    //    so we go up two levels to `swarm_worker/` then into `swarm-worker-common`.
+    let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    p.pop(); // .../swarm-worker/swarm-worker-tui
+    p.pop(); // .../swarm_worker
+    p.push("swarm-worker-common");
+    p.push("worker_config.json");
+    p
 }
 
 /// Load existing config store in worker_config.json
@@ -63,11 +77,15 @@ pub fn save_core_config(cfg: &CoreConfig) -> Result<()> {
 
 /// Retrieve worker status from worker_id through http endpoint in server
 pub async fn retrieve_worker_status(session: Session) -> Result<WorkerStatusEnum> {
-    let cfg = load_core_config()?;
-    let worker_id = cfg.worker_id;
-    let worker_status: WorkerStatusEnum = commands::get_worker_status(&session, worker_id)
-        .await
-        .context("failed to retrieve worker status in commands")?;
+    let cfg = load_core_config().context("failed to load core configuration")?;
 
-    Ok(worker_status)
+    let worker_id = cfg
+        .worker_id
+        .ok_or_else(|| anyhow!("no worker_id found in configuration"))?;
+
+    let status = commands::get_worker_status(&session, worker_id)
+        .await
+        .context("failed to retrieve worker status from Core")?;
+
+    Ok(status)
 }

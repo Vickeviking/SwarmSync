@@ -1,13 +1,13 @@
-use crate::{commands, state};
-use anyhow::Error;
+use crate::state;
+use anyhow::{anyhow, bail, Error};
 use dialoguer::{theme::ColorfulTheme, Select};
-use swarm_worker_common::{commands, config::{self, save_core_config}};
-
-
-lazy_static::lazy_static! {
-    // store the Child handle so we can kill it later
-    static ref WORKER_HANDLE: Mutex<Option<Child>> = Mutex::new(None);
-}
+use lazy_static::lazy_static;
+use swarm_worker_common::{
+    commands,
+    config::{self, config_file_path},
+    model::WorkerStatusEnum,
+    net::Session,
+};
 
 /// Main menu loop presenting user actions and handling navigation.
 pub async fn main_menu() -> anyhow::Result<()> {
@@ -20,28 +20,38 @@ pub async fn main_menu() -> anyhow::Result<()> {
             "User Settings",
             "Quit",
         ];
-        let worker_status_string = view_worker_status();
+        let worker_status_string_res = view_worker_status().await;
+        let worker_status_string = match worker_status_string_res {
+            Ok(worker_status) => worker_status,
+            _ => "Not configured".to_string(),
+        };
         let choice = Select::with_theme(&ColorfulTheme::default())
-            .with_prompt(fmt!("Main Menu - {}", worker_status_string))
+            .with_prompt(&format!("Main Menu – {}", worker_status_string))
             .items(&options)
             .default(0)
             .interact()?;
 
         match choice {
             0 => {
-                start_worker();
+                let _ = start_worker();
                 continue;
+            }
             1 => {
                 stop_worker();
                 continue;
             }
             2 => {
-                view_worker_status();
+                let worker_status_string_res = view_worker_status().await;
+                let worker_status_string = match worker_status_string_res {
+                    Ok(worker_status) => worker_status,
+                    _ => "Not configured".to_string(),
+                };
+                println!("worker status: {}", worker_status_string);
                 continue;
             }
             3 => {
-                // ── User-settings submenu ────                
-                user_settings_tui();
+                // ── User-settings submenu ────
+                user_settings_tui().await?;
                 continue; // back to main loop
             }
             4 => {
@@ -54,101 +64,94 @@ pub async fn main_menu() -> anyhow::Result<()> {
     }
 }
 
-fn start_worker() -> Result<()> {
-    // 1. Ensure Worker is not already running
-    if is_worker_running() {
-        println!("Worker is already running.");
+// Assume a global or static mutable for the Child handle:
+use std::sync::Mutex;
+lazy_static! {
+    static ref WORKER_PROCESS: Mutex<Option<std::process::Child>> = Mutex::new(None);
+}
+
+fn start_worker() -> anyhow::Result<(), anyhow::Error> {
+    let mut proc_slot = WORKER_PROCESS.lock().unwrap();
+    if proc_slot.is_some() {
+        println!("Worker is already running!");
         return Ok(());
     }
-    // 2. Save current config (ensure auth token and base_url are up-to-date in worker_config.json)
-    save_core_config(current_config)?;
-    // 3. Spawn the Worker process
-    let mut cmd = Command::new("swarm-worker");
-    cmd.stdout(Stdio::piped())  // capture stdout to catch the IP message
-       .stderr(Stdio::piped()); // (could also redirect stderr to file if needed)
-    #[cfg(target_family = "unix")]
-    {
-        use std::os::unix::process::CommandExt;
-        cmd.before_exec(|| { unsafe { libc::setsid() }; Ok(()) });
-    }
-    let mut child = cmd.spawn()?;
-    // 4. Optionally, read one-time startup messages (like register IP) from stdout
-    if let Some(stdout) = child.stdout.take() {
-        use std::io::{BufReader, BufRead};
-        let reader = BufReader::new(stdout);
-        if let Some(Ok(line)) = reader.lines().next() {
-            if line.contains("register") {
-                println!("{}", line); // Display the register IP message to user
+
+    // Spawn the worker process
+    let child = std::process::Command::new("swarm-worker")
+        .arg("--config")
+        .arg(&config_file_path())
+        .spawn()
+        .expect("Failed to spawn swarm-worker");
+
+    println!("Swarm worker started (PID {})", child.id());
+
+    // Store it first
+    *proc_slot = Some(child);
+
+    // Now spawn a thread that will wait on the global handle,
+    // *not* on the local `child` you just moved into proc_slot.
+    std::thread::spawn(|| {
+        let mut guard = WORKER_PROCESS.lock().unwrap();
+        if let Some(mut child) = guard.take() {
+            if let Ok(status) = child.wait() {
+                println!(
+                    "Swarm worker process {} exited with status {}",
+                    child.id(),
+                    status
+                );
             }
         }
-        // We won't continuously read further output to avoid log flooding
-    }
-    // 5. Store child handle (or at least PID) for monitoring and later use
-    WORKER_CHILD_HANDLE = Some(child);
-    println!("Worker started successfully.");
+    });
+
     Ok(())
 }
 
-
-fn stop_worker() -> Result<()> {
-    if !is_worker_running() {
-        println!("Worker is not running.");
-        return Ok(());
-    }
-    // 1. Send shutdown request via IPC or signal
-    if let Some(pid) = stored_worker_pid() {
-        // Preferred: send IPC command
-        if let Err(e) = send_ipc_command("shutdown") {
-            // If IPC fails (no socket?), fallback to SIGTERM
-            #[cfg(unix)]
-            unsafe { libc::kill(pid, libc::SIGTERM); }
-            #[cfg(windows)]
-            { /* call TerminateProcess or skip for graceful windows handling */ }
+fn status_worker() -> String {
+    let mut proc_slot = WORKER_PROCESS.lock().unwrap();
+    if let Some(child) = proc_slot.as_mut() {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                // Process has exited
+                proc_slot.take(); // set to None
+                format!("Worker stopped (exit code {})", status.code().unwrap_or(-1))
+            }
+            Ok(None) => {
+                format!("Worker is running (PID {})", child.id())
+            }
+            Err(e) => {
+                format!("Error checking worker status: {}", e)
+            }
         }
     } else {
-        // If no PID (shouldn't happen if running), just attempt IPC
-        let _ = send_ipc_command("shutdown");
+        "Worker is not running.".to_string()
     }
-    // 2. Wait for the Worker to exit gracefully
-    for i in 0..10 {
-        if !is_worker_running() {
+}
+
+fn stop_worker() {
+    let mut proc_slot = WORKER_PROCESS.lock().unwrap();
+    if let Some(mut child) = proc_slot.take() {
+        println!("Stopping worker (PID {})...", child.id());
+        if let Err(e) = child.kill() {
+            println!("Failed to kill worker: {}", e);
+        } else {
+            let _ = child.wait(); // ensure it's reaped
             println!("Worker stopped.");
-            break;
         }
-        std::thread::sleep(std::time::Duration::from_millis(100));
+    } else {
+        println!("No worker running.");
     }
-    if is_worker_running() {
-        println!("Worker did not shut down in time, forcing exit.");
-        // Force kill as last resort
-        if let Some(pid) = stored_worker_pid() {
-            #[cfg(unix)]
-            unsafe { libc::kill(pid, libc::SIGKILL); }
-            #[cfg(windows)]
-            { /* TerminateProcess as last resort */ }
-        }
-    }
-    // 3. Cleanup: remove any state, reset status
-    WORKER_CHILD_HANDLE = None;
-    Ok(())
 }
 
-pub fn view_worker_status() -> anyhow::Result<(), Error>{
-    let seassion: Seassion = state.get_session();
+pub async fn view_worker_status() -> anyhow::Result<String, Error> {
+    let session: Session = state::get_session();
     let cfg = config::load_core_config()?;
-    let worker_status: WorkerStatusEnum = commands::get_worker_status(seassion, cfg.worker_id); 
-    print!("Worker status: [{}]", worker_status.to_string());
+    let worker_id: i32 = cfg.worker_id.ok_or_else(|| anyhow!("worker id not set"))?;
+    let worker_status: WorkerStatusEnum = commands::get_worker_status(&session, worker_id).await?;
+    return Ok(format!("Worker status: [{}]", worker_status.to_string()).to_string());
 }
 
-pub fn view_worker_status() -> anyhow::Result<(), Error>{
-    let seassion: Seassion = state.get_session();
-    let cfg = config::load_core_config()?;
-    let worker_status: WorkerStatusEnum = commands::get_worker_status(seassion, cfg.worker_id); 
-    print!("Worker status: [{}]", worker_status.to_string());
-}
-
-
-
-async fn user_settings_tui() {
+async fn user_settings_tui() -> anyhow::Result<(), anyhow::Error> {
     let sub_opts = vec!["Change Core / IP", "Update Profile", "Back"];
     let sel = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("User Settings")
@@ -163,6 +166,7 @@ async fn user_settings_tui() {
             let new_session = crate::views::auth::auth_flow(&new_base).await?;
             state::set_session(new_session)?;
             println!("✅ Configuration updated.");
+            Ok(())
         }
         1 => {
             // update-profile flow
@@ -182,7 +186,7 @@ async fn user_settings_tui() {
                 .allow_empty(true)
                 .interact_text()?;
 
-            let result = crate::commands::update_user(
+            let result = commands::update_user(
                 &sess,
                 if new_username.is_empty() {
                     &sess.user.username
@@ -209,10 +213,11 @@ async fn user_settings_tui() {
                     s.user = updated;
                     state::set_session(s)?;
                     println!("✅ Profile updated.");
+                    Ok(())
                 }
-                Err(err) => println!("❌ {}", err),
+                Err(err) => Err(err),
             }
         }
-        _ => {}
+        _ => bail!("Not a valid option"),
     }
 }

@@ -615,6 +615,8 @@ COPY public.job_results (id, job_id, stdout, files, saved_at) FROM stdin;
 --
 
 COPY public.jobs (id, user_id, job_name, image_url, image_format, docker_flags, output_type, output_paths, schedule_type, cron_expression, notes, state, error_message, created_at, updated_at) FROM stdin;
+1	1	Helloworld	http:lalal	DockerRegistry	\N	Files	{result,lolalla}	Once	\N	\N	Queued	\N	2025-04-28 11:37:04.567136	2025-04-28 11:37:42.039033
+2	1	hejsan	diejde	DockerRegistry	\N	Stdout	\N	Once	\N	\N	Submitted	\N	2025-04-28 11:44:00.768558	2025-04-28 11:44:00.773763
 \.
 
 
@@ -648,6 +650,7 @@ COPY public.worker_status (id, worker_id, status, last_heartbeat, active_job_id,
 --
 
 COPY public.workers (id, user_id, label, ip_address, hostname, ssh_user, ssh_key, docker_version, arch, os, tags, created_at, last_seen_at) FROM stdin;
+1	1	LinuxDator	127.0.0.1	localhost	root	~/.ssh/id_rsa	20.10.7	x86_64	Linux	{}	2025-04-28 11:36:05.667064	\N
 \.
 
 
@@ -683,7 +686,7 @@ SELECT pg_catalog.setval('public.job_results_job_id_seq', 1, false);
 -- Name: jobs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.jobs_id_seq', 1, false);
+SELECT pg_catalog.setval('public.jobs_id_seq', 2, true);
 
 
 --
@@ -725,7 +728,7 @@ SELECT pg_catalog.setval('public.worker_status_worker_id_seq', 1, false);
 -- Name: workers_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.workers_id_seq', 1, false);
+SELECT pg_catalog.setval('public.workers_id_seq', 1, true);
 
 
 --

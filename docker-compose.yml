@@ -44,38 +44,22 @@ services:
       - CORE_API_URL=http://core:8000
 
   swarm-worker:
-    build:
-      context: ./swarm_worker/swarm-worker
-      dockerfile: Dockerfile
+    build: ./swarm_worker
     container_name: swarmsync-worker
     depends_on:
       - core
     environment:
       - CORE_API_URL=http://core:8000
-      - WORKER_CONFIG_PATH=/worker/worker_config.json
+      - WORKER_CONFIG_PATH=/worker/config/worker_config.json
       - DOCKER_HOST=unix:///var/run/docker.sock
     volumes:
-      - ./swarm_worker/swarm-worker-common/worker_config.json:/worker/worker_config.json:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: ["swarm-worker", "--config", "/worker/worker_config.json"]
-
-  swarm-worker-tui:
-    build:
-      context: ./swarm_worker/swarm-worker-tui
-      dockerfile: Dockerfile
-    container_name: swarmsync-worker-tui
-    depends_on:
-      - core
-      - swarm-worker
-    environment:
-      - CORE_API_URL=http://core:8000
-      - WORKER_CONFIG_PATH=/tui/worker_config.json
-    volumes:
-      - ./swarm_worker/swarm-worker-common/worker_config.json:/tui/worker_config.json
+      # mount the named volume here:
+      - worker-config-data:/worker/config
+      # allow Docker engine use
       - /var/run/docker.sock:/var/run/docker.sock
     stdin_open: true
     tty: true
-    entrypoint: ["swarm-worker-tui"]
+    # Entrypoint is in the image (swarm-worker-tui)
 
   db_backup:
     image: alpine:3.17
@@ -96,3 +80,4 @@ services:
 
 volumes:
   postgres_data: {}
+  worker-config-data: {}

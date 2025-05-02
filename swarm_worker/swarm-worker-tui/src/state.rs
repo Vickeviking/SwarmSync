@@ -1,6 +1,6 @@
-use crate::client::Session;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
+use swarm_worker_common::net::Session;
 
 /// Global mutable store for the current session (authenticated client and user).
 static SESSION: Lazy<Mutex<Option<Session>>> = Lazy::new(|| Mutex::new(None));

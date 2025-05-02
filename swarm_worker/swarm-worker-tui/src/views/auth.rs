@@ -1,7 +1,7 @@
-use crate::client::{build_authed_client, Session};
-use crate::commands;
-use crate::models::UserResponse;
-use crate::views::connect::{config_file_path, CoreConfig};
+use swarm_worker_common::commands;
+use swarm_worker_common::config::{config_file_path, CoreConfig};
+use swarm_worker_common::model::UserResponse;
+use swarm_worker_common::net::{build_authed_client, Session};
 
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
 use std::fs;
@@ -60,6 +60,8 @@ pub async fn auth_flow(base_url: &str) -> anyhow::Result<Session> {
         .unwrap_or_else(|| CoreConfig {
             base_url: base_url.to_string(),
             last_username: None,
+            worker_status_enum: None,
+            worker_id: None,
         });
     cfg.last_username = Some(user.username.clone());
     fs::write(config_file_path(), serde_json::to_string_pretty(&cfg)?)?;
