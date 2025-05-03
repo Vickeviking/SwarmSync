@@ -75,11 +75,7 @@ async fn main() -> Result<()> {
 
                     // periodic heartbeat every 50 ms → IDLE/BUSY
                     _ = async {
-                        let payload = if rand::thread_rng().gen_ratio(1, 2) {
-                            format!("{worker_id},BUSY")
-                        } else {
-                            format!("{worker_id},IDLE")
-                        };
+                        let payload = format!("{worker_id},IDLE");
 
                         match socket.send_to(payload.as_bytes(), &core_addr).await {
                             Ok(n) => println!("HB‑TX {n} B -> {core_addr}: {payload}"),
