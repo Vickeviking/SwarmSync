@@ -4,22 +4,7 @@ use serde_json::json;
 use url::Url;
 
 use super::model::{Job, JobResult, UserResponse, WorkerStatusEnum};
-use super::net::{self, Session};
-
-/// Turn “core” or “http://core” or “http://core:8080”
-/// into “http://core:8000”
-pub fn http_with_rocket_port(base: &str) -> Result<String> {
-    let mut url = Url::parse(base)
-        .or_else(|_| Url::parse(&format!("http://{base}"))) // bare “core”
-        .with_context(|| format!("BASE_URL “{base}” is not a valid URL"))?;
-
-    // Only add port if none already present
-    if url.port().is_none() {
-        url.set_port(Some(8000))
-            .map_err(|_| anyhow!("could not set :8000 on {url}"))?;
-    }
-    Ok(url.to_string().trim_end_matches('/').to_string())
-}
+use super::net::{self, http_with_rocket_port, Session};
 
 /// Register a new user via `/users`
 pub async fn register_user(
@@ -120,7 +105,7 @@ pub async fn update_user(
         payload["password"] = json!(pw);
     }
 
-    let http_base = format!("{}:8000", session.app_host.trim_end_matches('/'));
+    let http_base = http_with_rocket_port(&session.app_host)?;
     let res = session
         .client
         .put(format!("{}/users/{}", http_base, session.user.id))
@@ -168,7 +153,7 @@ pub async fn submit_job(
         "state": initial_state
     });
 
-    let http_base = format!("{}:8000", session.app_host.trim_end_matches('/'));
+    let http_base = http_with_rocket_port(&session.app_host)?;
     let res = session
         .client
         .post(format!("{}/jobs", http_base))
@@ -187,7 +172,7 @@ pub async fn submit_job(
 
 /// List all jobs for the current user
 pub async fn list_jobs(session: &Session) -> anyhow::Result<Vec<Job>> {
-    let http_base = format!("{}:8000", session.app_host.trim_end_matches('/'));
+    let http_base = http_with_rocket_port(&session.app_host)?;
     let url = format!("{}/jobs/by_admin?user_id={}", http_base, session.user.id);
     let res = session.client.get(url).send().await?;
     if !res.status().is_success() {
@@ -210,7 +195,7 @@ pub async fn get_finished_jobs(session: &Session) -> anyhow::Result<Vec<Job>> {
 
 /// Fetch `/results/job/<id>`
 pub async fn get_results_for_job(session: &Session, job_id: i32) -> anyhow::Result<Vec<JobResult>> {
-    let http_base = format!("{}:8000", session.app_host.trim_end_matches('/'));
+    let http_base = http_with_rocket_port(&session.app_host)?;
     let url = format!("{}/results/job/{}", http_base, job_id);
     let res = session.client.get(url).send().await?;
     if res.status() == StatusCode::NOT_FOUND {
@@ -229,7 +214,7 @@ pub async fn get_results_for_job(session: &Session, job_id: i32) -> anyhow::Resu
 /// Fetch workerStatusEnum from worker_id
 
 pub async fn get_worker_status(session: &Session, worker_id: i32) -> Result<WorkerStatusEnum> {
-    let http_base = format!("{}:8000", session.app_host.trim_end_matches('/'));
+    let http_base = http_with_rocket_port(&session.app_host)?;
     let url = format!("{}/worker-status/worker/{}", http_base, worker_id);
 
     let resp = session

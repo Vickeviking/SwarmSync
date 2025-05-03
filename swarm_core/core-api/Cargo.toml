@@ -1,0 +1,39 @@
+[package]
+name    = "core-api"         # CLI crate
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "core-api"
+path = "src/main.rs"
+
+# ───── Your own shared library ─────────────────────────────────────────────
+[dependencies]
+common          = { path = "../common" }
+
+# ----- Workspace‑pinned crates (inherit versions/features) -----------------
+tokio           = { workspace = true }
+tokio-stream    = { workspace = true }
+cron            = { workspace = true }
+futures         = { workspace = true }
+lsp_doc_stable  = { workspace = true }
+thiserror       = { workspace = true }
+anyhow          = { workspace = true }
+serde           = { workspace = true }
+serde_json      = { workspace = true }
+chrono          = { workspace = true }
+uuid            = { workspace = true }
+rand            = { workspace = true }
+diesel          = { workspace = true }  
+diesel-async    = { workspace = true }
+argon2       = { workspace = true , default-features = false, features = ["std"] }
+
+# ------- Rocket specific ------------
+rocket = { version = "0.5", features = ["json"] }
+rocket_db_pools = { version = "0.1", features = ["diesel_postgres", "deadpool_redis"] }
+
+# ───── Dev‑only ------------------------------------------------------------
+[dev-dependencies]
+reqwest         = { version = "0.11", features = ["json", "blocking"] }
+tokio           = { workspace = true }
+uuid            = { workspace = true }

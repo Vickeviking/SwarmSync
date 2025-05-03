@@ -14,8 +14,11 @@ services:
     container_name: swarmsync-redis
 
   core:
-    build: ./swarm_core
+    build:
+      context: ./swarm_core
+      dockerfile: Dockerfile
     container_name: swarmsync-core
+    working_dir: /usr/src/swarm_core
     environment:
       - DATABASE_URL=postgres://postgres:postgres@postgres:5432/app_db
       - REDIS_URL=redis://redis:6379
@@ -23,11 +26,10 @@ services:
       - postgres
       - redis
     ports:
-      - "8000:8000" # Core HTTP
-      - "5001:5001/udp" # Core UDP heartbeat
+      - "8000:8000" # HTTP
+      - "5001:5001/udp" # UDP heartbeat
     volumes:
-      - ./swarm_core:/app
-    entrypoint: ["tail", "-f", "/dev/null"]
+      - ./swarm_core:/usr/src/swarm_core
 
   consumer:
     build:

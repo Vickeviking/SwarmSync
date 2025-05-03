@@ -1,46 +1,21 @@
-[package]
-name = "swarmsync-core"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members   = ["common", "core-api", "commanddeck"]
+resolver  = "2"                  # enables [workspace.dependencies]
 
-[[bin]]
-name = "core"
-path = "src/bin/core.rs"
-
-[[bin]]
-name = "commanddeck"
-path = "src/bin/commanddeck.rs"
-
-
-[dependencies]
-rocket = { version = "0.5", features = ["json"] }
-rocket_db_pools = { version = "0.1", features = ["diesel_postgres", "deadpool_redis"] }
-diesel = { version = "2.1", features = ["chrono"] }
-diesel-async = { version = "0.4", features = ["postgres"] }
-serde = "1.0"
-serde_json = "1.0"
-chrono = { version = "0.4", features = ["serde"] }
-clap = "4.4"
+# One place to pin versions every crate shares:
+[workspace.dependencies]
+tokio           = { version = "1",  features = ["full"] }
+tokio-stream    = { version = "0.1.17", features = ["sync"] }
+cron            = "0.15.0"
+futures         = "0.3.31"
+lsp_doc_stable  = "0.1.0"
+thiserror       = "2.0.12"
+serde           = { version = "1.0", features = ["derive"] }
+serde_json      = "1.0"
+chrono          = { version = "0.4", features = ["serde"] }
+anyhow          = "1.0"
+uuid            = { version = "1.16.0", features = ["v4"] }
+rand            = "0.8"
+diesel          = { version = "2.1",  features = ["chrono"] }
+diesel-async    = { version = "0.4", features = ["postgres"] }
 argon2 = { version = "0.4", default-features = false, features = ["std"] }
-uuid = { version = "1.16.0", features = ["v4"]}
-rand = "0.8"
-# User cli
-crossterm = "0.26"
-ratatui = "0.23" 
-petgraph = "0.6" 
-dialoguer = "0.11"
-anyhow = "1.0"
-
-#async stuff
-tokio = { version = "1", features = ["full"] }
-tokio-stream = { version = "0.1.17",  features = ["sync"]}
-cron = "0.15.0"
-futures = "0.3.31"
-lsp_doc_stable = "0.1.0"
-thiserror = "2.0.12"
-
-[dev-dependencies]
-reqwest = { version = "0.11", features = ["json", "blocking"] }
-tokio = { version = "1", features = ["full"] }
-uuid = { version = "1.16.0", features = ["v4"]}
-

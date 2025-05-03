@@ -1,0 +1,41 @@
+[package]
+name    = "commanddeck"         # CLI crate
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "commanddeck"
+path = "src/main.rs"
+
+# ───── Your own shared library ─────────────────────────────────────────────
+[dependencies]
+common          = { path = "../common" }
+
+# ----- CLI / TUI stacks -------------------------
+clap            = { version = "4.4", features = ["derive"] }
+crossterm       = "0.26"
+ratatui         = "0.23"
+dialoguer       = "0.11"
+petgraph        = "0.6"
+
+# ----- Workspace‑pinned crates (inherit versions/features) -----------------
+tokio           = { workspace = true }
+tokio-stream    = { workspace = true }
+cron            = { workspace = true }
+futures         = { workspace = true }
+lsp_doc_stable  = { workspace = true }
+thiserror       = { workspace = true }
+anyhow          = { workspace = true }
+serde           = { workspace = true }
+serde_json      = { workspace = true }
+chrono          = { workspace = true }
+uuid            = { workspace = true }
+rand            = { workspace = true }
+diesel          = { workspace = true }        # transitively needed via `common`
+diesel-async    = { workspace = true }
+
+# ───── Dev‑only ------------------------------------------------------------
+[dev-dependencies]
+reqwest         = { version = "0.11", features = ["json", "blocking"] }
+tokio           = { workspace = true }
+uuid            = { workspace = true }
