@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tokio::task;
 
 pub struct ModuleInitializer {
-    pub dispatcher_task: task::JoinHandle<()>,
+    pub dispatcher_task: task::JoinHandle<anyhow::Result<(), anyhow::Error>>,
     pub harvester_task: task::JoinHandle<()>,
     pub hibernator_task: task::JoinHandle<()>,
     pub logger_task: task::JoinHandle<()>,

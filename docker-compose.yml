@@ -41,7 +41,7 @@ services:
     entrypoint: ["tail", "-f", "/dev/null"]
     profiles: ["cli"]
     environment:
-      - CORE_API_URL=http://core:8000
+      - CORE_API_URL=http://core
 
   swarm-worker:
     build: ./swarm_worker
@@ -49,7 +49,7 @@ services:
     depends_on:
       - core
     environment:
-      - CORE_API_URL=http://core:8000
+      - CORE_API_URL=http://core
       - WORKER_CONFIG_PATH=/worker/config/worker_config.json
       - DOCKER_HOST=unix:///var/run/docker.sock
     volumes:

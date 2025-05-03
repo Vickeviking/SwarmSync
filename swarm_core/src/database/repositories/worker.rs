@@ -116,4 +116,8 @@ impl WorkerRepository {
     pub async fn delete_worker(c: &mut AsyncPgConnection, id: i32) -> QueryResult<usize> {
         diesel::delete(workers::table.find(id)).execute(c).await
     }
+
+    pub async fn list_all(c: &mut AsyncPgConnection) -> QueryResult<Vec<Worker>> {
+        workers::table.load(c).await
+    }
 }

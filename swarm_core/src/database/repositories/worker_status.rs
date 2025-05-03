@@ -131,4 +131,15 @@ impl WorkerStatusRepository {
             .execute(c)
             .await
     }
+
+    pub async fn update_status_by_worker_id(
+        c: &mut AsyncPgConnection,
+        worker_id: i32,
+        status: WorkerStatusEnum,
+    ) -> QueryResult<WorkerStatus> {
+        diesel::update(worker_status::table.filter(worker_status::worker_id.eq(worker_id)))
+            .set(worker_status::status.eq(status))
+            .get_result(c)
+            .await
+    }
 }

@@ -2,9 +2,10 @@ use crate::api::auth;
 use crate::database::models::job::{Job, JobAssignment, NewJob, NewJobAssignment};
 use crate::database::models::log::{DBLogEntry, NewDBLogEntry};
 use crate::database::models::user::{NewUser, User};
-use crate::database::models::worker::{NewWorker, Worker};
+use crate::database::models::worker::{NewWorker, NewWorkerStatus, Worker};
 use crate::database::repositories::{
     JobAssignmentRepository, JobRepository, LogEntryRepository, UserRepository, WorkerRepository,
+    WorkerStatusRepository,
 };
 use crate::shared::enums::image_format::ImageFormatEnum;
 use crate::shared::enums::job::JobStateEnum;
@@ -12,7 +13,7 @@ use crate::shared::enums::log::{LogActionEnum, LogLevelEnum};
 use crate::shared::enums::output::OutputTypeEnum;
 use crate::shared::enums::schedule::ScheduleTypeEnum;
 use crate::shared::enums::system::SystemModuleEnum;
-use crate::shared::enums::workers::OSEnum;
+use crate::shared::enums::workers::{OSEnum, WorkerStatusEnum};
 use anyhow::Context;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use diesel_async::{AsyncConnection, AsyncPgConnection};
@@ -201,28 +202,54 @@ pub async fn get_job_by_id(id: i32) -> anyhow::Result<Job> {
 
 // ======= WORKERS =========
 
-pub async fn create_worker(user_id: i32, label: String) -> anyhow::Result<(), anyhow::Error> {
-    let mut c = load_db_connection().await?;
+pub async fn create_worker(user_id: i32, label: String) -> anyhow::Result<()> {
+    // ── 1. Open connection ─────────────────────────────────────────────
+    let mut conn: AsyncPgConnection = load_db_connection().await.context("DB connect failed")?;
 
-    let new_worker = NewWorker {
-        user_id,
-        label,
-        ip_address: "127.0.0.1".to_string(),
-        hostname: "localhost".to_string(),
-        ssh_user: "root".to_string(),
-        ssh_key: "~/.ssh/id_rsa".to_string(),
-        docker_version: "20.10.7".to_string(),
-        arch: "x86_64".to_string(),
-        os: OSEnum::Linux,
-        tags: None,
-    };
+    // ── 2. Run both inserts in a single transaction ────────────────────
+    conn.transaction::<_, anyhow::Error, _>(|tx| {
+        Box::pin(async move {
+            /* 2.1 insert into `workers` */
+            let worker = WorkerRepository::create(
+                tx,
+                NewWorker {
+                    user_id,
+                    label,
+                    ip_address: "127.0.0.1".into(),
+                    hostname: "localhost".into(),
+                    ssh_user: "root".into(),
+                    ssh_key: "~/.ssh/id_rsa".into(),
+                    docker_version: "20.10.7".into(),
+                    arch: "x86_64".into(),
+                    os: OSEnum::Linux,
+                    tags: None,
+                },
+            )
+            .await?;
 
-    match WorkerRepository::create(&mut c, new_worker).await {
-        Ok(worker) => println!("✅ Created worker '{}' (id: {})", worker.label, worker.id),
-        Err(e) => eprintln!("❌ Failed to create worker: {}", e),
-    }
+            /* 2.2 insert initial status row */
+            WorkerStatusRepository::create(
+                tx,
+                NewWorkerStatus {
+                    worker_id: worker.id,
+                    status: WorkerStatusEnum::Offline, // initial state
+                    last_heartbeat: None,
+                    active_job_id: None,
+                    uptime_sec: None,
+                    load_avg: None,
+                    last_error: None,
+                },
+            )
+            .await?;
 
-    Ok(())
+            println!(
+                "✅ Created worker '{}' (id: {}), status=Offline",
+                worker.label, worker.id
+            );
+            Ok(())
+        })
+    })
+    .await
 }
 
 pub async fn update_worker(worker_id: i32, label: String) -> anyhow::Result<(), anyhow::Error> {

@@ -1,5 +1,6 @@
 use reqwest;
 
+use crate::commands::http_with_rocket_port;
 use crate::model::UserResponse;
 use reqwest::{header, Client};
 
@@ -22,11 +23,8 @@ pub fn build_authed_client(token: &str) -> anyhow::Result<Client> {
 }
 
 /// Simple GET / to ensure the server is up.
-pub async fn is_reachable(url: &str) -> bool {
-    matches!(
-        reqwest::get(format!("{}/", url))
-            .await
-            .map(|r| r.status().is_success()),
-        Ok(true)
-    )
+pub async fn is_reachable(url: &str) -> anyhow::Result<bool> {
+    let http_base = http_with_rocket_port(url)?;
+    let resp = reqwest::get(format!("{}/", http_base)).await?;
+    Ok(resp.status().is_success())
 }

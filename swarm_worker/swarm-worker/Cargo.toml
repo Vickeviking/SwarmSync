@@ -18,3 +18,5 @@ swarm-worker-common = { path = "../swarm-worker-common" }
 clap          = { version = "4.1", features = ["derive"] }
 signal-hook = "0.3"
 rand = "0.8"
+url = "2.5.4"
+

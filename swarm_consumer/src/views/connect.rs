@@ -54,7 +54,7 @@ pub async fn choose_core_location() -> anyhow::Result<String> {
 
     // Use CORE_API_URL inside Docker, fallback to localhost on host
     let default_local =
-        std::env::var("CORE_API_URL").unwrap_or_else(|_| "http://127.0.0.1:8000".to_string());
+        std::env::var("CORE_API_URL").unwrap_or_else(|_| "http://127.0.0.1".to_string());
 
     let base_url = match choice {
         0 => default_local,
@@ -62,7 +62,7 @@ pub async fn choose_core_location() -> anyhow::Result<String> {
             let ip: String = Input::new()
                 .with_prompt("Enter Core server IP")
                 .interact_text()?;
-            format!("http://{}:8000", ip.trim())
+            format!("http://{}", ip.trim())
         }
         _ => unreachable!(),
     };

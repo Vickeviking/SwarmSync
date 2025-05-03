@@ -19,7 +19,7 @@ pub async fn choose_core_location() -> anyhow::Result<String> {
         .interact()?;
 
     if idx == 0 {
-        if is_reachable(&cfg.base_url).await {
+        if is_reachable(&cfg.base_url).await? {
             println!("✅ Connected to Core at {}", cfg.base_url);
             return Ok(cfg.base_url);
         }
@@ -36,7 +36,7 @@ pub async fn choose_core_location() -> anyhow::Result<String> {
     //WARNING: Add inside docker , other wise wont be found
     // Use CORE_API_URL inside Docker, fallback to localhost on host
     let default_local =
-        std::env::var("CORE_API_URL").unwrap_or_else(|_| "http://127.0.0.1:8000".to_string());
+        std::env::var("CORE_API_URL").unwrap_or_else(|_| "http://127.0.0.1".to_string());
 
     let base_url = match choice {
         0 => default_local,
@@ -44,12 +44,12 @@ pub async fn choose_core_location() -> anyhow::Result<String> {
             let ip: String = Input::new()
                 .with_prompt("Enter Core server IP")
                 .interact_text()?;
-            format!("http://{}:8000", ip.trim())
+            format!("http://{}", ip.trim())
         }
         _ => unreachable!(),
     };
     // ── 3. Verify connectivity, then save ─────────────────────────
-    if !is_reachable(&base_url).await {
+    if !is_reachable(&base_url).await? {
         println!("❌ Could not connect to Core at {}.", base_url);
         std::process::exit(1);
     }

@@ -160,3 +160,35 @@ impl From<DBLogEntry> for LogEntry {
         }
     }
 }
+
+impl From<&LogEntry> for NewDBLogEntry {
+    fn from(log: &LogEntry) -> Self {
+        NewDBLogEntry {
+            level: log.level.clone(),
+            module: log.module.clone(),
+            action: log.action.clone(),
+            expires_at: log.expires_at,
+
+            client_connected_ip: log.client_connected_payload.as_ref().map(|p| p.ip.clone()),
+            client_connected_username: log
+                .client_connected_payload
+                .as_ref()
+                .map(|p| p.username.clone()),
+
+            job_submitted_job_id: log.job_submitted_payload.as_ref().map(|p| p.job_id),
+            job_submitted_from_module: log
+                .job_submitted_payload
+                .as_ref()
+                .map(|p| p.from_module.clone()),
+            job_submitted_to_module: log
+                .job_submitted_payload
+                .as_ref()
+                .map(|p| p.to_module.clone()),
+
+            job_completed_job_id: log.job_completed_payload.as_ref().map(|p| p.job_id),
+            job_completed_success: log.job_completed_payload.as_ref().map(|p| p.success),
+
+            custom_msg: log.custom_msg.clone(),
+        }
+    }
+}

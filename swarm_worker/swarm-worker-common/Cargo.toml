@@ -13,3 +13,4 @@ chrono         = { workspace = true }
 once_cell      = { workspace = true }
 dialoguer      = { workspace = true }
 lsp_doc_stable = { workspace = true } 
+url = "2.5.4"

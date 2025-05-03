@@ -1,9 +1,25 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use reqwest::{Client, StatusCode};
 use serde_json::json;
+use url::Url;
 
 use super::model::{Job, JobResult, UserResponse, WorkerStatusEnum};
 use super::net::{self, Session};
+
+/// Turn “core” or “http://core” or “http://core:8080”
+/// into “http://core:8000”
+pub fn http_with_rocket_port(base: &str) -> Result<String> {
+    let mut url = Url::parse(base)
+        .or_else(|_| Url::parse(&format!("http://{base}"))) // bare “core”
+        .with_context(|| format!("BASE_URL “{base}” is not a valid URL"))?;
+
+    // Only add port if none already present
+    if url.port().is_none() {
+        url.set_port(Some(8000))
+            .map_err(|_| anyhow!("could not set :8000 on {url}"))?;
+    }
+    Ok(url.to_string().trim_end_matches('/').to_string())
+}
 
 /// Register a new user via `/users`
 pub async fn register_user(
@@ -13,79 +29,78 @@ pub async fn register_user(
     email: &str,
     password: &str,
 ) -> anyhow::Result<UserResponse> {
+    let http_base = http_with_rocket_port(base_url)?;
+    let url = format!("{http_base}/users");
+    println!("DEBUG register_user → {}", url); // <‑‑👀
+
     let res = client
-        .post(&format!("{}/users", base_url))
-        .json(&json!({
-            "username": username,
-            "email": email,
-            "password": password
-        }))
+        .post(&url)
+        .json(&json!({ "username": username, "email": email, "password": password }))
         .send()
-        .await?;
+        .await
+        .with_context(|| format!("POST {url} failed"))?; // <‑‑ context includes URL
 
     if !res.status().is_success() {
         let status = res.status();
-        let body_text = res.text().await.unwrap_or_default();
-
-        if status == StatusCode::BAD_REQUEST && body_text.contains("Password must") {
-            bail!(
-                "Registration failed: {}",
-                body_text.trim_matches(|c: char| c == '"' || c.is_whitespace())
-            );
-        }
-        if status == StatusCode::CONFLICT {
-            bail!("Registration failed: username or email already exists.");
-        }
-        bail!("Registration failed (status={}): {}", status, body_text);
+        let body = res.text().await.unwrap_or_default();
+        anyhow::bail!("register_user {url} → {status}: {body}");
     }
-
-    Ok(res.json().await?)
+    Ok(res.json().await.context("bad JSON in /users response")?)
 }
 
-/// Login via `/login` and then fetch the user via `/users/username/<name>`
 pub async fn login_user(
     client: &Client,
     base_url: &str,
     username: &str,
     password: &str,
 ) -> anyhow::Result<(String, UserResponse)> {
-    // ── 1. POST /login ────────────────────────────────────────────────
+    let http_base = http_with_rocket_port(base_url)?;
+    let login_url = format!("{http_base}/login");
+    println!("DEBUG login_user → {}", login_url); // <‑‑👀
+
     let res = client
-        .post(&format!("{}/login", base_url))
+        .post(&login_url)
         .json(&json!({ "username": username, "password": password }))
         .send()
-        .await?;
+        .await
+        .with_context(|| format!("POST {login_url} failed"))?;
 
     if res.status() == StatusCode::UNAUTHORIZED {
-        bail!("Login failed: invalid username or password.");
+        anyhow::bail!("login_user {login_url} → 401 UNAUTHORIZED");
     }
     if !res.status().is_success() {
         let status = res.status();
         let body = res.text().await.unwrap_or_default();
-        bail!("Login request failed (status={}): {}", status, body);
+        anyhow::bail!("login_user {login_url} → {status}: {body}");
     }
 
-    let resp_json: serde_json::Value = res.json().await?;
-    let token = resp_json["token"]
+    let token = res
+        .json::<serde_json::Value>()
+        .await
+        .context("malformed JSON in /login response")?["token"]
         .as_str()
-        .ok_or_else(|| anyhow::anyhow!("No token in response"))?
+        .ok_or_else(|| anyhow!("no token in /login response"))?
         .to_string();
 
-    // ── 2. Build authed client & GET /users/username/<username> ───────
-    let authed_client = net::build_authed_client(&token)?;
+    let authed = net::build_authed_client(&token)?;
+    let user_url = format!("{http_base}/users/username/{username}");
+    println!("DEBUG fetch_user → {}", user_url); // <‑‑👀
 
-    let user_resp = authed_client
-        .get(format!("{}/users/username/{}", base_url, username))
+    let res = authed
+        .get(&user_url)
         .send()
-        .await?;
+        .await
+        .with_context(|| format!("GET {user_url} failed"))?;
 
-    if !user_resp.status().is_success() {
-        bail!("Failed to fetch user info (status={})", user_resp.status());
+    if !res.status().is_success() {
+        anyhow::bail!("fetch_user {user_url} → {}", res.status());
     }
 
-    // endpoint returns Option<UserResponse>
-    let user_opt: Option<UserResponse> = user_resp.json().await?;
-    let user = user_opt.ok_or_else(|| anyhow::anyhow!("User lookup returned None"))?;
+    let user_opt: Option<UserResponse> = res
+        .json()
+        .await
+        .context("bad JSON in /users/username response")?;
+    let user = user_opt.ok_or_else(|| anyhow!("user not found"))?;
 
     Ok((token, user))
 }
@@ -105,9 +120,10 @@ pub async fn update_user(
         payload["password"] = json!(pw);
     }
 
+    let http_base = format!("{}:8000", session.app_host.trim_end_matches('/'));
     let res = session
         .client
-        .put(format!("{}/users/{}", session.app_host, session.user.id))
+        .put(format!("{}/users/{}", http_base, session.user.id))
         .json(&payload)
         .send()
         .await?;
@@ -152,9 +168,10 @@ pub async fn submit_job(
         "state": initial_state
     });
 
+    let http_base = format!("{}:8000", session.app_host.trim_end_matches('/'));
     let res = session
         .client
-        .post(format!("{}/jobs", session.app_host))
+        .post(format!("{}/jobs", http_base))
         .json(&payload)
         .send()
         .await?;
@@ -170,10 +187,8 @@ pub async fn submit_job(
 
 /// List all jobs for the current user
 pub async fn list_jobs(session: &Session) -> anyhow::Result<Vec<Job>> {
-    let url = format!(
-        "{}/jobs/by_admin?user_id={}",
-        session.app_host, session.user.id
-    );
+    let http_base = format!("{}:8000", session.app_host.trim_end_matches('/'));
+    let url = format!("{}/jobs/by_admin?user_id={}", http_base, session.user.id);
     let res = session.client.get(url).send().await?;
     if !res.status().is_success() {
         bail!("Failed to list jobs (status={})", res.status());
@@ -195,7 +210,8 @@ pub async fn get_finished_jobs(session: &Session) -> anyhow::Result<Vec<Job>> {
 
 /// Fetch `/results/job/<id>`
 pub async fn get_results_for_job(session: &Session, job_id: i32) -> anyhow::Result<Vec<JobResult>> {
-    let url = format!("{}/results/job/{}", session.app_host, job_id);
+    let http_base = format!("{}:8000", session.app_host.trim_end_matches('/'));
+    let url = format!("{}/results/job/{}", http_base, job_id);
     let res = session.client.get(url).send().await?;
     if res.status() == StatusCode::NOT_FOUND {
         return Ok(vec![]); // none yet
@@ -213,7 +229,8 @@ pub async fn get_results_for_job(session: &Session, job_id: i32) -> anyhow::Resu
 /// Fetch workerStatusEnum from worker_id
 
 pub async fn get_worker_status(session: &Session, worker_id: i32) -> Result<WorkerStatusEnum> {
-    let url = format!("{}/worker-status/worker/{}", session.app_host, worker_id);
+    let http_base = format!("{}:8000", session.app_host.trim_end_matches('/'));
+    let url = format!("{}/worker-status/worker/{}", http_base, worker_id);
 
     let resp = session
         .client
