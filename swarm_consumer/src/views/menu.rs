@@ -1,7 +1,12 @@
-use crate::{commands, state};
 use dialoguer::{theme::ColorfulTheme, Select};
 
+use crate::{commands, state};
+
 /// Main menu loop presenting user actions and handling navigation.
+/// # Returns
+/// * `anyhow::Result<()>`
+/// # Panics
+/// Does not panic.
 pub async fn main_menu() -> anyhow::Result<()> {
     loop {
         // Define the menu options
@@ -21,7 +26,7 @@ pub async fn main_menu() -> anyhow::Result<()> {
 
         match choice {
             0 => {
-                // ── User-settings submenu ───────────────────────────────
+                // ====== USER SETTINGS ======
                 let sub_opts = vec!["Change Core / IP", "Update Profile", "Back"];
                 let sel = Select::with_theme(&ColorfulTheme::default())
                     .with_prompt("User Settings")
@@ -31,9 +36,10 @@ pub async fn main_menu() -> anyhow::Result<()> {
 
                 match sel {
                     0 => {
-                        // re-run core+auth flow (same as before)
+                        // Call connect flow, allow user to change core location
                         let new_base = crate::views::connect::choose_core_location().await?;
                         let new_session = crate::views::auth::auth_flow(&new_base).await?;
+                        // Save new session
                         state::set_session(new_session)?;
                         println!("✅ Configuration updated.");
                     }

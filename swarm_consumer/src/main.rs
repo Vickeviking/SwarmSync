@@ -1,13 +1,15 @@
 #![warn(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #![forbid(unsafe_code)]
+#![doc = include_str!("../docs/overview.md")]
+//! The main entry point for Swarm Consumer TUI application
+
+use crate::views::{auth, connect, menu};
 
 mod client;
 mod commands;
 mod models;
 mod state;
 mod views;
-
-use crate::views::{auth, connect, menu};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

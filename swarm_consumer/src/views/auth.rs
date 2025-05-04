@@ -1,20 +1,29 @@
+use std::fs;
+
+use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
+
 use crate::client::{build_authed_client, Session};
 use crate::commands;
 use crate::models::UserResponse;
 use crate::views::connect::{config_file_path, CoreConfig};
 
-use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
-use std::fs;
-
 /// Prompt, authenticate (login / register), persist last username, return Session.
+/// # Args
+/// * `base_url` - The base URL of the Core instance, no port, e.g. `http://127.0.0.1`
+/// # Returns
+/// * `Session` - A session struct with the client, user, and app host
+/// # Example
+/// ```
+/// let session = auth_flow("http://127.0.0.1").await.unwrap();
+/// ```
 pub async fn auth_flow(base_url: &str) -> anyhow::Result<Session> {
-    // ── 1. Read saved username if any ─────────────────────────────
+    // Read saved username
     let saved_username = fs::read_to_string(config_file_path())
         .ok()
         .and_then(|s| serde_json::from_str::<CoreConfig>(&s).ok())
         .and_then(|c| c.last_username);
 
-    // ── 2. Choose Login or Register ───────────────────────────────
+    // Prompt for login or register
     let mode_items = ["Login", "Register"];
     let mode = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Authentication")
@@ -22,7 +31,7 @@ pub async fn auth_flow(base_url: &str) -> anyhow::Result<Session> {
         .default(0)
         .interact()?;
 
-    // ── 3. Username prompt (reuse saved by default) ───────────────
+    // Username prompt
     let username = if let Some(ref u) = saved_username {
         if Confirm::with_theme(&ColorfulTheme::default())
             .with_prompt(format!("Login as '{}'?", u))
@@ -37,10 +46,10 @@ pub async fn auth_flow(base_url: &str) -> anyhow::Result<Session> {
         Input::new().with_prompt("Username").interact_text()?
     };
 
-    // ── 4. Password prompt ────────────────────────────────────────
+    // Password prompt
     let password: String = Input::new().with_prompt("Password").interact_text()?;
 
-    // ── 5. Execute flow ───────────────────────────────────────────
+    // Login or register flow
     let client = reqwest::Client::new();
     let (token, user): (String, UserResponse) = if mode == 0 {
         // Login
@@ -53,7 +62,7 @@ pub async fn auth_flow(base_url: &str) -> anyhow::Result<Session> {
         (token, user)
     };
 
-    // ── 6. Save username back to config ───────────────────────────
+    // Save last username
     let mut cfg = fs::read_to_string(config_file_path())
         .ok()
         .and_then(|s| serde_json::from_str::<CoreConfig>(&s).ok())
@@ -64,7 +73,7 @@ pub async fn auth_flow(base_url: &str) -> anyhow::Result<Session> {
     cfg.last_username = Some(user.username.clone());
     fs::write(config_file_path(), serde_json::to_string_pretty(&cfg)?)?;
 
-    // ── 7. Build authed session object ────────────────────────────
+    // Build authed client, return session
     let authed_client = build_authed_client(&token)?;
     Ok(Session {
         client: authed_client,
