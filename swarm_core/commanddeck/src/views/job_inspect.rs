@@ -16,11 +16,15 @@ use ratatui::{
 };
 
 use anyhow::Context;
-use common::commands;
-use common::database::models::{job::Job, job::JobAssignment, worker::Worker};
-use common::enums::job::JobStateEnum;
-use common::utils::{self, SelectMenuResult};
 
+use common::{
+    commands,
+    database::models::{job::Job, job::JobAssignment, worker::Worker},
+    enums::job::JobStateEnum,
+    utils::{self, SelectMenuResult},
+};
+
+// Entry point for the JobInspect view
 pub async fn inspect() -> anyhow::Result<()> {
     let user_id_menu_result: SelectMenuResult = utils::select_user()
         .await
@@ -50,6 +54,13 @@ struct ModuleView<'a> {
     items: Vec<(String, Text<'a>)>,
 }
 
+/// Launches the JobInspect TUI
+/// # Arguments
+/// * `jobs` - The jobs to display
+/// * `workers` - The workers to display
+/// * `assignments` - The assignments to display
+/// # Returns
+/// * `anyhow::Result<()>`
 pub fn launch_graph_tui_with_data(
     jobs: &[Job],
     workers: &[Worker],
@@ -61,6 +72,7 @@ pub fn launch_graph_tui_with_data(
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
+    // run graph TUI powered by ratatui
     let result = run_app(&mut terminal, jobs, workers, assignments);
 
     disable_raw_mode()?;
@@ -210,6 +222,7 @@ fn run_app<'a, B: ratatui::backend::Backend>(
             f.render_widget(detail, outer_chunks[1]);
         })?;
 
+        // POLL for keyboard input
         if crossterm::event::poll(tick_rate - last_tick.elapsed())? {
             if let Event::Key(key) = event::read()? {
                 match key.code {

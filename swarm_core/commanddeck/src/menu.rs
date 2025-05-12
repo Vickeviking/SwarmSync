@@ -1,8 +1,11 @@
-use crate::views::{core_inspect, job_inspect, jobs, logs, users};
 use dialoguer::{theme::ColorfulTheme, Select};
 
+use crate::views::{core_inspect, job_inspect, jobs, logs, users};
+
+/// Entry point for the main menu
 pub async fn main_menu() -> anyhow::Result<()> {
     loop {
+        // available menu options
         let options = vec![
             "Exit",
             "Manage Users",
@@ -12,6 +15,7 @@ pub async fn main_menu() -> anyhow::Result<()> {
             "CoreInspect",
         ];
 
+        // Ask user for a choice
         let choice = Select::with_theme(&ColorfulTheme::default())
             .with_prompt("Main Menu")
             .default(0)

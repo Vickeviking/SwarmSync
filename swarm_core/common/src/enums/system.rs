@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::str::FromStr;
 
+/// not stored in db, used in IPC and logging
 #[derive(Debug, Clone)]
 pub enum CoreEvent {
     Startup,
@@ -39,6 +40,7 @@ impl FromStr for CoreEvent {
     }
 }
 
+/// not stored in db, used in IPC and logging
 #[derive(Debug, Clone)]
 pub enum Pulse {
     Slow,   // 1 minute
@@ -70,6 +72,7 @@ impl FromStr for Pulse {
     }
 }
 
+/// All available modules inside core, not stored in db, used in IPC and logging
 #[derive(AsExpression, Debug, Deserialize, Serialize, FromSqlRow, Clone)]
 #[diesel(sql_type = diesel::sql_types::VarChar)]
 pub enum SystemModuleEnum {
@@ -81,6 +84,7 @@ pub enum SystemModuleEnum {
     TaskArchive,
 }
 
+// used for logging alternatives, for choosing log level in dialoguer
 impl SystemModuleEnum {
     pub fn variants() -> &'static [&'static str] {
         &[
@@ -94,6 +98,7 @@ impl SystemModuleEnum {
     }
 }
 
+// used for selelection menue inside dialoguer
 impl From<usize> for SystemModuleEnum {
     fn from(idx: usize) -> Self {
         match idx {

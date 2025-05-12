@@ -23,15 +23,14 @@ pub fn routes() -> Vec<Route> {
 /* ===================== ⚙️ JobMetric API Overview =====================
 
 == 🛠️ CRUD ==
-• POST   /metrics                             → Create new metric (NewJobMetric) → 201 Created (JobMetric)
-• GET    /metrics/:id                         → Fetch metric by ID             → 200 OK (JobMetric)
-• DELETE /metrics/:id                         → Delete metric by ID            → 204 No Content
+• POST   /metrics/:                Create a new metric (NewJobMetric)       → 201 Created (JobMetric)
+• GET    /metrics/:id              Fetch a metric by ID                      → 200 OK (JobMetric)
+• DELETE /metrics/:id              Delete a metric by ID                     → 204 No Content
 
 == 🔍 Lookup & Search ==
-• GET    /metrics/by_job/:job_id              → Metrics by Job ID              → 200 OK (Vec<JobMetric>)
-• GET    /metrics/by_worker/:worker_id        → Metrics by Worker ID           → 200 OK (Vec<JobMetric>)
-• GET    /metrics/recent/:job_id              → Most recent metric for Job     → 200 OK (Option<JobMetric>)
-• GET    /metrics/chronological/:job_id       → Chronological metrics for Job  → 200 OK (Vec<JobMetric>)
+• GET    /metrics/by_job/:job_id     List all metrics for a given job       → 200 OK (Vec<JobMetric>)
+• GET    /metrics/by_worker/:worker_id   List all metrics for a worker      → 200 OK (Vec<JobMetric>)
+• GET    /metrics/recent/:job_id      Get the most recent metric for a job    → 200 OK (Option<JobMetric>)
 
 ======================================================================== */
 

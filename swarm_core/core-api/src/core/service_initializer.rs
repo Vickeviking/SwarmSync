@@ -1,11 +1,12 @@
-use crate::core::shared_resources::SharedResources;
-use crate::core::PulseBroadcaster;
-
+///! Spawns the core services, as of now pulse broadcaster
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::signal;
 use tokio::sync::Notify;
 use tokio::task::JoinHandle;
+
+use crate::core::shared_resources::SharedResources;
+use crate::core::PulseBroadcaster;
 
 #[derive(Error, Debug)]
 pub enum InitError {
@@ -15,8 +16,10 @@ pub enum InitError {
     SignalError(#[from] std::io::Error),
 }
 
+/// Spawns the core servicec, as of now the pulse broadcaster and shutdown watcher
 pub struct ServiceInitializer {
     pulse_broadcaster: Option<PulseBroadcaster>,
+    /// a notifier for ctrl-c, that will emit up to main
     pub shutdown_notify: Arc<Notify>,
 }
 

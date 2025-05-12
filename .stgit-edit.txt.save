@@ -1,0 +1,9 @@
+Patch:  add-dummy-tests
+Author: Viktor Liljenberg <viktorlilienberg@gmail.com>
+Date:   2025-05-12 22:48:24 +0200
+
+Added integration test folders, dummy unit tests, aswell as reworked makefile to include these changes, alongside with a new $(require_core), requiring core for command
+
+# Please enter the message for your patch. Lines starting with
+# '#' will be ignored. An empty message aborts the new patch.
+# The patch name and author information may also be modified.

@@ -1,8 +1,12 @@
-use common::enums::system::{CoreEvent, Pulse};
+///! The pulse broadcaster module, emits pulses on separate intervals.
+///! different modules in core can subscribe to these pulses, done by
+///! fetching subscriptions from `PulseBroadcaster`, and subscribing thorugh that module
 use tokio::select;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::time::{self, Duration};
+
+use common::enums::system::{CoreEvent, Pulse};
 
 /// Owns the broadcast channels and emits pulses over time.
 /// Consumed and run inside one task only.
@@ -27,6 +31,8 @@ impl PulseBroadcaster {
         }
     }
 
+    /// Returns the pulse subscriptions
+    /// Can be shared freely across threads and needed to initiate a subscription
     pub fn subscriptions(&self) -> PulseSubscriptions {
         PulseSubscriptions {
             slow_tx: self.slow_tx.clone(),

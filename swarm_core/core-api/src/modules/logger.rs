@@ -1,6 +1,13 @@
-// ================= logger.rs ==================
-use crate::core::PulseSubscriptions;
+use std::sync::Arc;
+
 use chrono::{NaiveDateTime, Utc};
+use diesel::prelude::{ExpressionMethods, QueryDsl};
+use diesel_async::AsyncPgConnection;
+use diesel_async::RunQueryDsl; // async execute/delete
+use tokio::select;
+use tokio::sync::{broadcast::Receiver, Mutex, RwLock};
+
+use crate::core::PulseSubscriptions;
 use common::commands::load_db_connection;
 use common::database::models::log::{
     ClientConnectedPayload, JobCompletedPayload, JobSubmittedPayload, LogEntry, NewDBLogEntry,
@@ -8,22 +15,21 @@ use common::database::models::log::{
 use common::database::repositories::LogEntryRepository;
 use common::enums::log::{LogActionEnum, LogLevelEnum};
 use common::enums::system::{CoreEvent, Pulse, SystemModuleEnum};
-use diesel::prelude::{ExpressionMethods, QueryDsl};
-use diesel_async::AsyncPgConnection;
-use diesel_async::RunQueryDsl; // async execute/delete
-use std::sync::Arc;
-use tokio::select;
-use tokio::sync::{broadcast::Receiver, Mutex, RwLock};
 
 /// Central logger accessed by all modules
 pub struct Logger {
-    buffer_logs: RwLock<Vec<LogEntry>>, // flushed on pulse/shutdown
-    core_event_rx: Mutex<Receiver<CoreEvent>>, // lifecycle events
-    pulse_rx: Mutex<Receiver<Pulse>>,   // slow‑pulse every ~2 s
+    /// in-memory log buffer, flushed on pulse/shutdown
+    buffer_logs: RwLock<Vec<LogEntry>>,
+    /// Life cycle events, controls Logger behavior
+    core_event_rx: Mutex<Receiver<CoreEvent>>,
+    /// Slow pulse every ~2 s
+    pulse_rx: Mutex<Receiver<Pulse>>,
 }
 
 impl Logger {
     /* ---------------- construction + background loop -------------------- */
+    /// Init logger, only one instance ever running
+    //TODO: use some design pattern to only allow one instance to reduce bugs
     pub fn new(core_rx: Receiver<CoreEvent>, pulse_subs: Arc<PulseSubscriptions>) -> Self {
         Self {
             buffer_logs: RwLock::new(Vec::new()),
@@ -44,6 +50,9 @@ impl Logger {
                     CoreEvent::Shutdown => { self.store_all_logs().await; break; },
                 },
                 Ok(pulse) = pulse_rx.recv() => {
+                    // On pulse we do 2 things
+                    // 1. flush buffer to DB
+                    // 2. delete expired rows
                     if matches!(pulse, Pulse::Slow) {
                         self.try_clean().await;
                         self.store_all_logs().await;
@@ -54,15 +63,24 @@ impl Logger {
     }
 
     /* ---------------- public API --------------------------------------- */
+    // Commit a log entry to the buffer, needs to be flushed to DB on pulse for persistence
     #[allow(clippy::too_many_arguments)]
     pub async fn log(
-        logger: Arc<Self>, // accept owned Arc to match call sites
+        // the logger, in a thread safe ref counter
+        logger: Arc<Self>,
+        // the log level, determine expiration time
         level: LogLevelEnum,
+        // the module emitting the log
         module: SystemModuleEnum,
+        // the log action
         action: LogActionEnum,
+        // optional payload
         client: Option<ClientConnectedPayload>,
+        // optional payload
         submitted: Option<JobSubmittedPayload>,
+        // optional payload
         completed: Option<JobCompletedPayload>,
+        // optional custom message (payload)
         custom: Option<String>,
     ) {
         let now = Utc::now().naive_utc();
@@ -127,6 +145,7 @@ impl Logger {
         }
     }
 
+    /// Insert a batch of log entries to the DB.
     async fn insert_batch(entries: &[LogEntry]) -> anyhow::Result<()> {
         let mut conn: AsyncPgConnection = load_db_connection().await?;
         for e in entries {

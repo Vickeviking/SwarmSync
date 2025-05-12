@@ -24,6 +24,7 @@ pub async fn build_rocket(shared: Arc<SharedResources>) -> Rocket<Build> {
         "[Rocket] Loaded figment config with DB URL: {database_url} and Redis URL: {redis_url}"
     );
 
+    // Attach all databases to the Rocket, aswell as cors
     rocket::custom(figment)
         .attach(Cors)
         .attach(CacheConn::init())

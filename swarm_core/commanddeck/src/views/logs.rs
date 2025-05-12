@@ -1,13 +1,17 @@
 use anyhow::Result;
 use chrono::{Local, NaiveDateTime};
-use common::commands::{
-    create_log_entry, delete_log_entry, fetch_log_entry, fetch_logs, fetch_logs_by_action,
-    fetch_logs_by_level, fetch_logs_by_module, update_log_entry,
-};
-use common::database::models::log::DBLogEntry;
-use common::enums::{log::LogActionEnum, log::LogLevelEnum, system::SystemModuleEnum};
 use dialoguer::{theme::ColorfulTheme, Input, Select};
 
+use common::{
+    commands::{
+        create_log_entry, delete_log_entry, fetch_log_entry, fetch_logs, fetch_logs_by_action,
+        fetch_logs_by_level, fetch_logs_by_module, update_log_entry,
+    },
+    database::models::log::DBLogEntry,
+    enums::{log::LogActionEnum, log::LogLevelEnum, system::SystemModuleEnum},
+};
+
+// Logs main menu
 pub async fn menu() -> Result<()> {
     loop {
         let items = vec!["Back", "Create Log", "Browse Logs"];
@@ -27,6 +31,7 @@ pub async fn menu() -> Result<()> {
     Ok(())
 }
 
+// Create Log Flow
 async fn create_flow() -> Result<()> {
     let level = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Level")
@@ -88,6 +93,7 @@ async fn create_flow() -> Result<()> {
     Ok(())
 }
 
+// Browse Log Flow
 async fn id_flow() -> Result<()> {
     let id: i32 = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Log ID")
@@ -95,6 +101,7 @@ async fn id_flow() -> Result<()> {
     manage_single_log(id).await
 }
 
+// Browse Log Flow, Browse menu
 async fn browse_flow() -> Result<()> {
     loop {
         let opts = vec![
@@ -123,6 +130,7 @@ async fn browse_flow() -> Result<()> {
     Ok(())
 }
 
+/// Browse all logs
 async fn browse_all() -> Result<()> {
     let mut offset = 0;
     let limit = 10;
@@ -140,6 +148,7 @@ async fn browse_all() -> Result<()> {
     Ok(())
 }
 
+/// Browse logs by action
 async fn browse_action() -> Result<()> {
     let idx = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Action")
@@ -163,6 +172,7 @@ async fn browse_action() -> Result<()> {
     Ok(())
 }
 
+/// Browse logs by level
 async fn browse_level() -> Result<()> {
     let idx = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Level")
@@ -186,6 +196,7 @@ async fn browse_level() -> Result<()> {
     Ok(())
 }
 
+/// Browse logs by module
 async fn browse_module() -> Result<()> {
     let idx = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Module")
@@ -209,6 +220,9 @@ async fn browse_module() -> Result<()> {
     Ok(())
 }
 
+/// Select and manage a single log
+/// # Arguments
+/// * logs - List of logs
 async fn select_and_manage(logs: &[DBLogEntry]) -> Result<bool, anyhow::Error> {
     for entry in logs {
         println!(
@@ -236,6 +250,10 @@ async fn select_and_manage(logs: &[DBLogEntry]) -> Result<bool, anyhow::Error> {
     Ok(false)
 }
 
+/// Paginate offset
+/// # Arguments
+/// * `offset` - Current offset
+/// * `limit` - Current limit
 fn paginate_offset(offset: i64, limit: i64) -> Result<i64, anyhow::Error> {
     let actions = vec!["Next Page", "Prev Page"];
     let choice = Select::with_theme(&ColorfulTheme::default())
@@ -250,6 +268,9 @@ fn paginate_offset(offset: i64, limit: i64) -> Result<i64, anyhow::Error> {
     })
 }
 
+/// Single log edit
+/// # Arguments
+/// * `id` - ID of the log to edit
 async fn manage_single_log(id: i32) -> Result<(), anyhow::Error> {
     let actions = vec!["Back", "Edit", "Delete"];
     let choice = Select::with_theme(&ColorfulTheme::default())

@@ -8,6 +8,7 @@ use std::fmt;
 use std::io::Write;
 use std::str::FromStr;
 
+/// ScheduleTypeEnum, how is the job scheduled
 #[derive(AsExpression, Debug, FromSqlRow, Serialize, Deserialize, Clone, PartialEq)]
 #[diesel(sql_type = diesel::sql_types::VarChar)]
 pub enum ScheduleTypeEnum {
@@ -15,6 +16,7 @@ pub enum ScheduleTypeEnum {
     Cron,
 }
 
+// serialize to json, and display
 impl fmt::Display for ScheduleTypeEnum {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let label = match self {
@@ -25,6 +27,7 @@ impl fmt::Display for ScheduleTypeEnum {
     }
 }
 
+// deserialize from json
 impl FromStr for ScheduleTypeEnum {
     type Err = ();
 
@@ -37,6 +40,7 @@ impl FromStr for ScheduleTypeEnum {
     }
 }
 
+// deserialize from database
 impl FromSql<Text, Pg> for ScheduleTypeEnum {
     fn from_sql(value: PgValue<'_>) -> diesel::deserialize::Result<Self> {
         match value.as_bytes() {
@@ -47,6 +51,7 @@ impl FromSql<Text, Pg> for ScheduleTypeEnum {
     }
 }
 
+// serialize to database
 impl ToSql<Text, Pg> for ScheduleTypeEnum {
     fn to_sql<'b>(
         &'b self,

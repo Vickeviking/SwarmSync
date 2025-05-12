@@ -28,19 +28,19 @@ pub fn routes() -> Vec<Route> {
 /* ===================== ⚙️ Worker API Overview =====================
 
 == 🛠️ CRUD ==
-• POST    /workers                           → Create new worker (NewWorker)      → 201 Created (Worker)
-• GET     /workers/:id                       → Fetch worker by ID                 → 200 OK (Worker)
-• DELETE  /workers/:id                       → Delete worker by ID                → 204 No Content
-• PUT     /workers/:id                       → Update worker by ID                → 200 OK (Worker)
+• POST    /workers                                      → Create new worker (NewWorker)      → 201 Created (Worker)
+• GET     /workers/:id                                  → Fetch worker by ID                 → 200 OK (Worker)
+• DELETE  /workers/:id                                  → Delete worker by ID                → 204 No Content
+• PATCH   /workers/:id                                  → Update worker by ID                → 200 OK (Worker)
 
 == 🔍 Lookup & Search ==
-• GET     /workers/admin/:admin_id           → Workers by Admin ID                → 200 OK (Vec<Worker>)
-• GET     /workers/label/:label              → Find worker by label               → 200 OK (Option<Worker>)
-• GET     /workers/ip/:ip_address            → Find worker by IP address          → 200 OK (Option<Worker>)
-• GET     /workers/admin/:admin_id/list      → List workers by Admin (paginated)  → 200 OK (Vec<Worker>)
+• GET     /workers/admin/:admin_id                      → Workers by Admin ID                → 200 OK (Vec<Worker>)
+• GET     /workers/label/:label                         → Find worker by label               → 200 OK (Option<Worker>)
+• GET     /workers/ip/:ip_address                       → Find worker by IP address          → 200 OK (Option<Worker>)
+• GET     /workers/admin/:admin_id/list?<page>&<limit>  → List workers by Admin (paginated)  → 200 OK (Vec<Worker>)
 
 == 🔄 State Update ==
-• PUT     /workers/:id/last-seen             → Update last-seen timestamp         → 200 OK (Worker)
+• PUT     /workers/:id/last-seen                        → Update last-seen timestamp         → 200 OK (Worker)
 
 ======================================================================== */
 

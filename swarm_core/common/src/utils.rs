@@ -1,3 +1,8 @@
+/// For commanddeck
+use anyhow::{Context, Result};
+use dialoguer::Input;
+use dialoguer::{theme::ColorfulTheme, Select};
+
 use crate::commands;
 use crate::commands::load_db_connection;
 use crate::database::repositories::JobAssignmentRepository;
@@ -6,9 +11,6 @@ use crate::database::{
     repositories::{JobRepository, UserRepository, WorkerRepository},
 };
 use crate::enums::job::JobStateEnum;
-use anyhow::{Context, Result};
-use dialoguer::Input;
-use dialoguer::{theme::ColorfulTheme, Select};
 
 /// Used as return type to either represent a 'back' or successfull select
 pub enum SelectMenuResult {
@@ -274,12 +276,33 @@ pub async fn mark_running(id: i32) -> anyhow::Result<Job> {
     Ok(JobRepository::mark_running(&mut conn, id).await?)
 }
 
+/// Mark a job as succeeded
+/// # Arguments
+/// * `id` - The ID of the job to mark as succeeded
 pub async fn mark_succeeded(id: i32) -> anyhow::Result<Job> {
     let mut conn = load_db_connection().await?;
     Ok(JobRepository::mark_succeeded(&mut conn, id).await?)
 }
 
+/// Mark a job as failed
+/// # Arguments
+/// * `id` - The ID of the job to mark as failed
+/// * `message` - The failure message
 pub async fn mark_failed(id: i32, message: &str) -> anyhow::Result<Job> {
     let mut conn = load_db_connection().await?;
     Ok(JobRepository::mark_failed(&mut conn, id, message).await?)
+}
+
+// TODO: move file into commands.rs?
+// TODO: write tests here
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A dummy test to ensure your test harness is working.
+    #[test]
+    fn dummy_test() {
+        // Replace this with real assertions as you go
+        assert_eq!(2 + 2, 4);
+    }
 }

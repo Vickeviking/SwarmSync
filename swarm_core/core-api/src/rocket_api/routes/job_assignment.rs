@@ -27,21 +27,21 @@ pub fn routes() -> Vec<Route> {
 /* ===================== ⚙️ JobAssignment API Overview =====================
 
 == 🛠️ CRUD ==
-• POST   /assignments                    → Create new assignment (NewJobAssignment) → 201 Created (JobAssignment)
-• GET    /assignments/:id               → Fetch assignment by ID → 200 OK (JobAssignment)
-• DELETE /assignments/:id               → Delete assignment by ID → 204 No Content
+• POST   /assignments                              → Create new assignment (NewJobAssignment) → 201 Created (JobAssignment)
+• GET    /assignments/:id                          → Fetch assignment by ID                 → 200 OK (JobAssignment)
+• DELETE /assignments/:id                          → Delete assignment by ID                → 204 No Content
 
 == 🔍 Lookup & Search ==
-• GET /assignments/by_job/:job_id                  → Assignments by Job ID → 200 OK (Vec<JobAssignment>)
-• GET /assignments/by_worker/:worker_id            → Assignments by Worker ID → 200 OK (Vec<JobAssignment>)
-• GET /assignments/lookup/:job_id/:worker_id       → Assignment by Job + Worker → 200 OK (Option<JobAssignment>)
-• GET /assignments/by_worker/range?worker_id&start&end
-                                                  → Assignments in time range for worker → 200 OK (Vec<JobAssignment>)
-• GET /assignments/active                          → Currently active assignments → 200 OK (Vec<JobAssignment>)
+• GET    /assignments/by_job/:job_id               → Assignments by Job ID                  → 200 OK (Vec<JobAssignment>)
+• GET    /assignments/by_worker/:worker_id         → Assignments by Worker ID               → 200 OK (Vec<JobAssignment>)
+• GET    /assignments/lookup/:job_id/:worker_id    → Assignment by Job+Worker               → 200 OK (Option<JobAssignment>)
+• GET    /assignments/by_worker/range?worker_id&start&end
+                                                  → Assignments in time range for worker   → 200 OK (Vec<JobAssignment>)
+• GET    /assignments/active                       → Currently active assignments           → 200 OK (Vec<JobAssignment>)
 
 == 🔄 State Transitions ==
-• PATCH /assignments/:id/started   → Mark assignment as started (NaiveDateTime) → 200 OK (JobAssignment)
-• PATCH /assignments/:id/finished  → Mark assignment as finished (NaiveDateTime) → 200 OK (JobAssignment)
+• PATCH  /assignments/:id/started                  → Mark assignment as started (NaiveDateTime) → 200 OK (JobAssignment)
+• PATCH  /assignments/:id/finished                 → Mark assignment as finished(NaiveDateTime) → 200 OK (JobAssignment)
 
 ======================================================================== */
 
@@ -94,6 +94,24 @@ async fn delete_assignment(
 
 // ========== Lookup & Search =======
 
+#[get("/assignments/lookup/<job_id>/<worker_id>")]
+async fn lookup_assignment(
+    mut db: Connection<DbConn>,
+    job_id: i32,
+    worker_id: i32,
+    _user: User,
+) -> Result<Json<Option<JobAssignment>>, Custom<serde_json::Value>> {
+    JobAssignmentRepository::find_assignment_by_job_and_worker(&mut db, job_id, worker_id)
+        .await
+        .map(Json)
+        .map_err(|e| {
+            Custom(
+                Status::InternalServerError,
+                json!({ "error": e.to_string() }),
+            )
+        })
+}
+
 #[get("/assignments/by_job/<job_id>")]
 async fn get_assignments_by_job_id(
     mut db: Connection<DbConn>,
@@ -118,24 +136,6 @@ async fn get_assignments_by_worker_id(
     _user: User,
 ) -> Result<Json<Vec<JobAssignment>>, Custom<serde_json::Value>> {
     JobAssignmentRepository::find_by_worker_id(&mut db, worker_id)
-        .await
-        .map(Json)
-        .map_err(|e| {
-            Custom(
-                Status::InternalServerError,
-                json!({ "error": e.to_string() }),
-            )
-        })
-}
-
-#[get("/assignments/lookup/<job_id>/<worker_id>")]
-async fn lookup_assignment(
-    mut db: Connection<DbConn>,
-    job_id: i32,
-    worker_id: i32,
-    _user: User,
-) -> Result<Json<Option<JobAssignment>>, Custom<serde_json::Value>> {
-    JobAssignmentRepository::find_assignment_by_job_and_worker(&mut db, job_id, worker_id)
         .await
         .map(Json)
         .map_err(|e| {

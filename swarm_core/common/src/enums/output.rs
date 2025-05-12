@@ -1,13 +1,15 @@
+use std::fmt;
+use std::io::Write;
+use std::str::FromStr;
+
 use diesel::deserialize::{FromSql, FromSqlRow};
 use diesel::expression::AsExpression;
 use diesel::pg::{Pg, PgValue};
 use diesel::serialize::ToSql;
 use diesel::sql_types::Text;
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::io::Write;
-use std::str::FromStr;
 
+/// Output Type, either stdout or files, payload provided as option in further fields inside job
 #[derive(AsExpression, Debug, FromSqlRow, Serialize, Deserialize, PartialEq)]
 #[diesel(sql_type = diesel::sql_types::VarChar)]
 pub enum OutputTypeEnum {
@@ -15,6 +17,7 @@ pub enum OutputTypeEnum {
     Files, // Files will be stored separately
 }
 
+// serialize to json, and log as string
 impl fmt::Display for OutputTypeEnum {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let label = match self {
@@ -25,6 +28,7 @@ impl fmt::Display for OutputTypeEnum {
     }
 }
 
+// deserialize from json
 impl FromStr for OutputTypeEnum {
     type Err = ();
 
@@ -37,6 +41,7 @@ impl FromStr for OutputTypeEnum {
     }
 }
 
+// deserialize from database
 impl FromSql<Text, Pg> for OutputTypeEnum {
     fn from_sql(value: PgValue<'_>) -> diesel::deserialize::Result<Self> {
         match value.as_bytes() {
@@ -47,6 +52,7 @@ impl FromSql<Text, Pg> for OutputTypeEnum {
     }
 }
 
+// serialize to database
 impl ToSql<Text, Pg> for OutputTypeEnum {
     fn to_sql<'b>(
         &'b self,

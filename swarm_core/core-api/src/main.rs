@@ -7,7 +7,6 @@ use common::enums::system::CoreEvent;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 use tokio::sync::Mutex;
-
 pub mod core;
 pub mod modules;
 pub mod rocket_api;

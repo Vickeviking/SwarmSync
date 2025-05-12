@@ -1,30 +1,11 @@
-/* ==================== 🛠️ Supported Actions ====================
-
-== CRUD ==
-• `POST /worker-status` → create(NewWorkerStatus) -> WorkerStatus
-• `GET /worker-status/:id` → find_by_id(id) -> WorkerStatus
-• `DELETE /worker-status/:id` → delete_worker_status(id) -> usize
-
-== Lookup & Search ==
-• `GET /worker-status/worker/:worker_id` → find_by_worker_id(worker_id) -> Option<WorkerStatus>
-
-== State Update ==
-• `PUT /worker-status/:id/status` → update_status(id, status) -> WorkerStatus
-• `PUT /worker-status/:id/last-heartbeat` → update_last_heartbeat(id, last_heartbeat) -> WorkerStatus
-• `PUT /worker-status/:id/active-job-id` → update_active_job_id(id, active_job_id) -> WorkerStatus
-• `PUT /worker-status/:id/uptime` → update_uptime(id, uptime_sec) -> WorkerStatus
-• `PUT /worker-status/:id/load-avg` → update_load_avg(id, load_avg) -> WorkerStatus
-• `PUT /worker-status/:id/last-error` → update_last_error(id, last_error) -> WorkerStatus
-
-*/
-
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
+
+use chrono::Utc;
 
 use crate::database::models::worker::{NewWorkerStatus, WorkerStatus};
 use crate::database::schema::*;
 use crate::enums::workers::WorkerStatusEnum;
-use chrono::Utc;
 
 pub struct WorkerStatusRepository;
 

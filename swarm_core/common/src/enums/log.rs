@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::str::FromStr;
 
+/// Enum for log levels, decides how long a log is stored
 #[derive(AsExpression, Debug, Deserialize, Serialize, FromSqlRow, Clone)]
 #[diesel(sql_type = diesel::sql_types::VarChar)]
 pub enum LogLevelEnum {
@@ -18,12 +19,14 @@ pub enum LogLevelEnum {
     Fatal,
 }
 
+// used for logging alternatives, for choosing log level in dialoguer
 impl LogLevelEnum {
     pub fn variants() -> &'static [&'static str] {
         &["Info", "Success", "Warning", "Error", "Fatal"]
     }
 }
 
+// used for selelection menue inside dialoguer
 impl From<usize> for LogLevelEnum {
     fn from(idx: usize) -> Self {
         match idx {
@@ -37,6 +40,7 @@ impl From<usize> for LogLevelEnum {
     }
 }
 
+// serialization and logging
 impl fmt::Display for LogLevelEnum {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
@@ -50,6 +54,7 @@ impl fmt::Display for LogLevelEnum {
     }
 }
 
+// deserialize from database
 impl FromSql<Text, Pg> for LogLevelEnum {
     fn from_sql(value: PgValue<'_>) -> diesel::deserialize::Result<Self> {
         match value.as_bytes() {
@@ -63,6 +68,7 @@ impl FromSql<Text, Pg> for LogLevelEnum {
     }
 }
 
+// serialize to database
 impl ToSql<Text, Pg> for LogLevelEnum {
     fn to_sql<'b>(
         &'b self,
@@ -79,6 +85,7 @@ impl ToSql<Text, Pg> for LogLevelEnum {
     }
 }
 
+/// Enum for log actions
 #[derive(AsExpression, Debug, Deserialize, Serialize, FromSqlRow, Clone)]
 #[diesel(sql_type = diesel::sql_types::VarChar)]
 pub enum LogActionEnum {
@@ -90,6 +97,7 @@ pub enum LogActionEnum {
     Custom,
 }
 
+// used for logging alternatives, for choosing log level in dialoguer
 impl LogActionEnum {
     pub fn variants() -> &'static [&'static str] {
         &[
@@ -103,6 +111,7 @@ impl LogActionEnum {
     }
 }
 
+// used for selelection menue inside dialoguer
 impl From<usize> for LogActionEnum {
     fn from(idx: usize) -> Self {
         match idx {
@@ -117,6 +126,7 @@ impl From<usize> for LogActionEnum {
     }
 }
 
+// serialization and logging
 impl fmt::Display for LogActionEnum {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
@@ -131,6 +141,7 @@ impl fmt::Display for LogActionEnum {
     }
 }
 
+// deserialize from json
 impl FromStr for LogActionEnum {
     type Err = ();
 
@@ -147,6 +158,7 @@ impl FromStr for LogActionEnum {
     }
 }
 
+// deserialize from database
 impl FromSql<Text, Pg> for LogActionEnum {
     fn from_sql(value: PgValue<'_>) -> diesel::deserialize::Result<Self> {
         match value.as_bytes() {
@@ -161,6 +173,7 @@ impl FromSql<Text, Pg> for LogActionEnum {
     }
 }
 
+// serialize to database
 impl ToSql<Text, Pg> for LogActionEnum {
     fn to_sql<'b>(
         &'b self,

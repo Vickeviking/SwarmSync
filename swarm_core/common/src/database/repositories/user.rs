@@ -1,36 +1,8 @@
-/* ==================== 🛠️ Supported Actions ====================
-
-== CRUD ==
-• `GET /users/:id` → find_by_id(id) -> User
-• `POST /users` → create(NewUser) -> User
-• `DELETE /users/:id` → delete(id) -> usize
-• `PUT /users/:id` → update(id, User) -> User
-
-== Lookup ==
-• `GET /users/email/:email` → find_by_email(email) -> Option<User>
-• `GET /users/username/:username` → find_by_username(username) -> Option<User>
-
-== Search ==
-• `GET /users/search/username?q=alice` → search_by_username(query) -> Vec<User>
-• `GET /users/search/email?q=example.com` → search_by_email(query) -> Vec<User>
-
-== Listing ==
-• `GET /users?page=x&limit=y` → list_all(limit, offset) -> Vec<User>
-
-== Existence Checks ==
-• `HEAD /users/exists/email/:email` → exists_by_email(email) -> bool
-• `HEAD /users/exists/username/:username` → exists_by_username(username) -> bool
-
-== Relational & Aggregation ==
-• `GET /users/with-jobs` → find_users_with_jobs() -> Vec<User>
-• `GET /users/job-counts` → get_user_with_job_counts() -> Vec<(User, i64)>
-
-*/
+use diesel::prelude::*;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
 use crate::database::models::user::{NewUser, User};
 use crate::database::schema::*;
-use diesel::prelude::*;
-use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
 pub struct UserRepository;
 

@@ -1,10 +1,17 @@
+///! Shared resources between modules,
+///! Logger - used by all modules, to log internal events, no mutex needed, have internal mutexes
+///! Pulse subscriptions - used by all modules to subscribe to pulses, no mutex needed
+///! Service channels - broadcast channels for one-to-many communication, subscribe to core event
+///! Service wiring - one-to-one communication channels between modules,
+///!                  each module take() its channel sides upon initialization
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
 use crate::core::PulseSubscriptions;
 use crate::modules::Logger;
 use crate::services::{ServiceChannels, ServiceWiring};
 
-use std::sync::Arc;
-use tokio::sync::Mutex;
-
+/// All systemwide shared resources
 pub struct SharedResources {
     pub logger: Arc<Logger>,
     pub pulse_subscriptions: Arc<PulseSubscriptions>,
@@ -27,6 +34,7 @@ impl SharedResources {
         }
     }
 
+    // getters
     pub fn get_logger(&self) -> Arc<Logger> {
         Arc::clone(&self.logger)
     }

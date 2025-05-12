@@ -1,9 +1,3 @@
-// ********** FILE CONTENT **********
-//  Models for:
-//      Log
-//
-// ***********************************
-
 use chrono::NaiveDateTime;
 use diesel::{prelude::*, Insertable};
 use serde::{Deserialize, Serialize};
@@ -11,51 +5,70 @@ use serde::{Deserialize, Serialize};
 use crate::database::schema::*;
 use crate::enums::{log::LogActionEnum, log::LogLevelEnum, system::SystemModuleEnum};
 
-// Used in the application
+/// The LogEntry struct is the in-memory representation of the database model
+/// In-memory variant needed since the embedded payloads are not serializable?
 pub struct LogEntry {
     pub id: i32,
     pub created_at: NaiveDateTime,
+    // Level, used to filter, and automatic cleanup timer
     pub level: LogLevelEnum,
+    // Module log created from, used to filter
     pub module: SystemModuleEnum,
+    // Action describing the log, used to filter, custom action exists
     pub action: LogActionEnum,
     pub expires_at: NaiveDateTime,
 
-    // Embed the payloads directly
+    // Payload can be derived from the action: client_connected, job_submitted, job_completed or custom
+    // Embed client connected payload, if log revolves a client
     pub client_connected_payload: Option<ClientConnectedPayload>,
+    // Embeds job submitted payload if log revolves a job
     pub job_submitted_payload: Option<JobSubmittedPayload>,
+    // Embeds job completed payload if log revolves a job
     pub job_completed_payload: Option<JobCompletedPayload>,
+    // Optional custom message, used for custom actions
     pub custom_msg: Option<String>,
 }
 
+/// Client connected payload
 pub struct ClientConnectedPayload {
     pub ip: String,
+    // username of client connecting
     pub username: String,
 }
 
+/// Job submitted payload
 pub struct JobSubmittedPayload {
     pub job_id: i32,
+    // From and to module
     pub from_module: SystemModuleEnum,
     pub to_module: SystemModuleEnum,
 }
 
+/// Job completed payload
 pub struct JobCompletedPayload {
     pub job_id: i32,
+    // Whether job completed successfully
     pub success: bool,
 }
 
 // ====== DATABASE STORED STRUCTS ====
 
+/// The DBLogEntry struct is the database model of the LogEntry
 #[derive(Debug, Serialize, Deserialize, Queryable, Identifiable)]
 #[diesel(table_name = logs)]
 pub struct DBLogEntry {
     pub id: i32,
     pub created_at: NaiveDateTime,
+    // Level, used to filter, and automatic cleanup timer
     pub level: LogLevelEnum,
+    // Module log created from, used to filter
     pub module: SystemModuleEnum,
+    // Action describing the log, used to filter, custom action exists
     pub action: LogActionEnum,
     pub expires_at: NaiveDateTime,
 
     // Optional fields for the foreign keys to payload tables
+    // These payloads are summed up into structs inside the in-memory LogEntry variant
     pub client_connected_ip: Option<String>, // Nullable IP field
     pub client_connected_username: Option<String>, // Nullable Username field
 
@@ -69,15 +82,19 @@ pub struct DBLogEntry {
     pub custom_msg: Option<String>, // Nullable custom message
 }
 
+// Insertable DBLogEntry
 #[derive(Debug, Insertable, Deserialize)]
 #[diesel(table_name = logs)]
 pub struct NewDBLogEntry {
     pub level: LogLevelEnum,
+    // Module log created from
     pub module: SystemModuleEnum,
+    // Action describing the log
     pub action: LogActionEnum,
     pub expires_at: NaiveDateTime,
 
     // Optional fields for the foreign keys to payload tables
+    // These payloads are summed up into structs inside the in-memory LogEntry variant
     pub client_connected_ip: Option<String>, // Nullable IP field
     pub client_connected_username: Option<String>, // Nullable Username field
 
@@ -91,6 +108,7 @@ pub struct NewDBLogEntry {
     pub custom_msg: Option<String>, // Nullable custom message
 }
 
+// Convert from in-memory LogEntry to DBLogEntry
 impl From<LogEntry> for NewDBLogEntry {
     fn from(log: LogEntry) -> Self {
         // Convert LogEntry (with embedded payloads) to DBLogEntry (raw database model)
@@ -120,6 +138,7 @@ impl From<LogEntry> for NewDBLogEntry {
     }
 }
 
+// Convert from DBLogEntry to in-memory LogEntry
 impl From<DBLogEntry> for LogEntry {
     fn from(db: DBLogEntry) -> Self {
         let client_connected_payload = match (db.client_connected_ip, db.client_connected_username)
@@ -161,6 +180,7 @@ impl From<DBLogEntry> for LogEntry {
     }
 }
 
+// Convert from in-memory LogEntry to DBLogEntry
 impl From<&LogEntry> for NewDBLogEntry {
     fn from(log: &LogEntry) -> Self {
         NewDBLogEntry {

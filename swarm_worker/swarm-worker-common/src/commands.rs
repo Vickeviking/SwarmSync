@@ -1,7 +1,6 @@
 use anyhow::{anyhow, bail, Context, Result};
 use reqwest::{Client, StatusCode};
 use serde_json::json;
-use url::Url;
 
 use super::model::{Job, JobResult, UserResponse, WorkerStatusEnum};
 use super::net::{self, http_with_rocket_port, Session};

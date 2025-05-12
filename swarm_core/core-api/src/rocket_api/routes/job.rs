@@ -59,8 +59,8 @@ pub fn routes() -> Vec<Route> {
 
 == ⏱️ Scheduling & Readiness ==
 • GET    /jobs/scheduled                   -> All jobs with a schedule          → 200 OK (Vec<Job>)
-• GET    /jobs/cron_due?date&time         -> Cron jobs due at a given time     → 200 OK (Vec<Job>)
-• GET    /jobs/ready                       -> One-time jobs ready to run        → 200 OK (Vec<Job>)
+• GET    /jobs/cron_due?date&time          -> Cron jobs due at a given time     → 200 OK (Vec<Job>)
+• GET    /jobs/one-time-ready              -> One-time jobs ready to run        → 200 OK (Vec<Job>)
 
 == 📊 Aggregation & Stats ==
 • GET    /jobs/stats/admins                -> Job count grouped by admin ID     → 200 OK (Vec<(i32, i64)>)

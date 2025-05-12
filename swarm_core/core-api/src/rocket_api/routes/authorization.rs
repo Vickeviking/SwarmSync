@@ -14,6 +14,7 @@ pub fn routes() -> Vec<Route> {
     routes![login]
 }
 
+// Login route, used to get a session token and login a user account
 #[rocket::post("/login", format = "json", data = "<credentials>")]
 pub async fn login(
     mut db: Connection<DbConn>,

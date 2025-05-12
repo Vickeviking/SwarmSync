@@ -6,6 +6,8 @@ use std::sync::Mutex;
 static SESSION: Lazy<Mutex<Option<Session>>> = Lazy::new(|| Mutex::new(None));
 
 /// Set or replace the global session.
+/// # Arguments
+/// * `session` - The session to set.
 pub fn set_session(session: Session) -> anyhow::Result<()> {
     let mut guard = SESSION.lock().unwrap();
     *guard = Some(session);

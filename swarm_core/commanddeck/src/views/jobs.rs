@@ -1,14 +1,18 @@
 // src/cli/views/jobs.rs
 use anyhow::Context;
-use common::commands;
-use common::enums::{
-    image_format::ImageFormatEnum, output::OutputTypeEnum, schedule::ScheduleTypeEnum,
-};
-use common::utils::{
-    move_job_state, select_assignment, select_job, select_job_with_any, select_user,
-    select_worker_with_any, SelectMenuResult,
-};
+
 use dialoguer::{theme::ColorfulTheme, Input, Select};
+
+use common::{
+    commands,
+    enums::{image_format::ImageFormatEnum, output::OutputTypeEnum, schedule::ScheduleTypeEnum},
+    utils::{
+        move_job_state, select_assignment, select_job, select_job_with_any, select_user,
+        select_worker_with_any, SelectMenuResult,
+    },
+};
+
+// User Perspective
 pub async fn user_perspective_menu() -> anyhow::Result<()> {
     loop {
         let options = vec![
@@ -35,6 +39,7 @@ pub async fn user_perspective_menu() -> anyhow::Result<()> {
     Ok(())
 }
 
+// Job CRUD submenu
 async fn job_crud() -> anyhow::Result<()> {
     let user_id_menu_result: SelectMenuResult = select_user()
         .await
@@ -153,6 +158,7 @@ async fn job_crud() -> anyhow::Result<()> {
     Ok(())
 }
 
+// Worker CRUD submenu
 async fn worker_crud() -> anyhow::Result<()> {
     let user_id_menu_result: SelectMenuResult = select_user()
         .await
@@ -207,6 +213,7 @@ async fn worker_crud() -> anyhow::Result<()> {
     Ok(())
 }
 
+// Assignment submenu
 async fn assign_job() -> anyhow::Result<()> {
     let options = vec![
         "Back",

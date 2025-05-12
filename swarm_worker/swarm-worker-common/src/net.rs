@@ -1,8 +1,6 @@
-use reqwest;
-
-use crate::commands::http_with_rocket_port;
 use crate::model::UserResponse;
-use reqwest::{header, Client};
+use anyhow::{anyhow, Context, Result};
+use reqwest::{self, header, Client, Url};
 
 #[derive(Clone)]
 pub struct Session {

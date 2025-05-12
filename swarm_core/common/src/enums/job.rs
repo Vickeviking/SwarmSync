@@ -10,6 +10,7 @@ use diesel::serialize::ToSql;
 use diesel::sql_types::Text;
 use serde::{Deserialize, Serialize};
 
+/// JobStateEnum, the state of a job
 #[derive(AsExpression, Debug, Deserialize, Serialize, FromSqlRow, PartialEq)]
 #[diesel(sql_type = Text)]
 pub enum JobStateEnum {
@@ -20,6 +21,7 @@ pub enum JobStateEnum {
     Failed, // Can store dynamic error message
 }
 
+// serialize to json, and display
 impl fmt::Display for JobStateEnum {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let label = match self {
@@ -33,6 +35,7 @@ impl fmt::Display for JobStateEnum {
     }
 }
 
+// deserialize from json
 impl FromStr for JobStateEnum {
     type Err = ();
 
@@ -48,6 +51,7 @@ impl FromStr for JobStateEnum {
     }
 }
 
+// deserialize from database
 impl FromSql<Text, Pg> for JobStateEnum {
     fn from_sql(value: PgValue<'_>) -> diesel::deserialize::Result<Self> {
         match value.as_bytes() {
@@ -61,6 +65,7 @@ impl FromSql<Text, Pg> for JobStateEnum {
     }
 }
 
+// serialize to database
 impl ToSql<Text, Pg> for JobStateEnum {
     fn to_sql<'b>(
         &'b self,
@@ -77,6 +82,7 @@ impl ToSql<Text, Pg> for JobStateEnum {
     }
 }
 
+/// JobScheduleEnum, how is the job scheduled
 #[derive(AsExpression, Debug, Deserialize, Serialize, FromSqlRow, PartialEq, Eq)]
 #[diesel(sql_type = Text)]
 pub enum JobScheduleEnum {
@@ -84,6 +90,7 @@ pub enum JobScheduleEnum {
     Cron,
 }
 
+// serialize to json, and display
 impl fmt::Display for JobScheduleEnum {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let label = match self {
@@ -94,6 +101,7 @@ impl fmt::Display for JobScheduleEnum {
     }
 }
 
+// deserialize from json
 impl FromStr for JobScheduleEnum {
     type Err = ();
 
@@ -106,6 +114,7 @@ impl FromStr for JobScheduleEnum {
     }
 }
 
+// deserialize from database
 impl FromSql<Text, Pg> for JobScheduleEnum {
     fn from_sql(value: PgValue<'_>) -> diesel::deserialize::Result<Self> {
         match value.as_bytes() {
@@ -116,6 +125,7 @@ impl FromSql<Text, Pg> for JobScheduleEnum {
     }
 }
 
+// serialize to database
 impl ToSql<Text, Pg> for JobScheduleEnum {
     fn to_sql<'b>(
         &'b self,

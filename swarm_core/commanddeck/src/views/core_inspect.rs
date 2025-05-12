@@ -1,28 +1,36 @@
+use std::io;
+use std::time::{Duration, Instant};
+
 use anyhow::Result;
-use common::commands::fetch_logs_by_module;
-use common::enums::system::SystemModuleEnum;
+
 use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
 use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
+
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph};
 use ratatui::Terminal;
-use std::io;
-use std::time::{Duration, Instant};
 
+use common::commands::fetch_logs_by_module;
+use common::enums::system::SystemModuleEnum;
+
+/// Entry point for the CoreInspect view, powered by ratatui
 pub async fn inspect() -> Result<()> {
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
+
+    // Enter raw mode and hide cursor
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
+    // set modules to all available SystemModules
     let modules = SystemModuleEnum::variants()
         .iter()
         .map(|s| s.to_string())
@@ -34,6 +42,7 @@ pub async fn inspect() -> Result<()> {
     let tick_rate = Duration::from_millis(200);
     let mut last_tick = Instant::now();
 
+    // Menu loop
     loop {
         // fetch logs for module before drawing (avoid block_on)
         let module = SystemModuleEnum::from(sel);
@@ -41,6 +50,7 @@ pub async fn inspect() -> Result<()> {
             .await
             .unwrap_or_default();
 
+        // Draw UI
         terminal.draw(|f| {
             let size = f.size();
             let chunks = Layout::default()

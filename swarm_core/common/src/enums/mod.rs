@@ -1,3 +1,4 @@
+///! Enums for the database stored in db
 pub mod image_format;
 pub mod job;
 pub mod log;

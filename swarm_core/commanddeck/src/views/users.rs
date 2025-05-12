@@ -1,9 +1,13 @@
 use anyhow::{Context, Result};
-use common::commands;
-use common::utils::{self, SelectMenuResult};
+use common::{
+    commands,
+    utils::{self, SelectMenuResult},
+};
 use dialoguer::{theme::ColorfulTheme, Input, Select};
 
+/// Entry point for the User Management view
 pub async fn menu() -> anyhow::Result<()> {
+    // menu loop
     loop {
         let options = vec![
             "Back",
@@ -33,6 +37,7 @@ pub async fn menu() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// List users
 async fn list_users() -> anyhow::Result<()> {
     let mut offset: i64 = 0;
     let limit: i64 = 10;
@@ -58,6 +63,12 @@ async fn list_users() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Create user
+/// # Panics
+/// Does not panic, but returns error if
+/// * Username already exists,
+/// * Email already exists,
+/// * Password is invalid
 async fn create_user() -> anyhow::Result<()> {
     let username: String = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Username")
@@ -73,6 +84,12 @@ async fn create_user() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Update user
+/// # Panics
+/// Does not panic, but returns error if
+/// * User does not exist
+/// * Email already exists
+/// * Password is invalid
 async fn update_user() -> anyhow::Result<()> {
     let user_id_menu_result: SelectMenuResult = utils::select_user()
         .await
@@ -96,6 +113,7 @@ async fn update_user() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Delete user
 async fn delete_user() -> anyhow::Result<()> {
     let user_id_menu_result: SelectMenuResult = utils::select_user()
         .await
@@ -110,6 +128,7 @@ async fn delete_user() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Delete user from a range, inclusive
 async fn delete_many_users() -> Result<()> {
     // helper to read an i32 or bail on "back"
     async fn prompt_id(prompt: &str) -> Result<Option<i32>> {

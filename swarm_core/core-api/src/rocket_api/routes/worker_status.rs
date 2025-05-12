@@ -28,24 +28,26 @@ pub fn routes() -> Vec<Route> {
 /* ===================== ⚙️ WorkerStatus API Overview =====================
 
 == 🛠️ CRUD ==
-• POST    /worker-status                      → Create new status (NewWorkerStatus)     → 201 Created (WorkerStatus)
-• GET     /worker-status/:id                  → Fetch status by ID                       → 200 OK (WorkerStatus)
-• DELETE  /worker-status/:id                  → Delete status by ID                      → 204 No Content
+• POST    /worker-status                       → Create new status (NewWorkerStatus)     → 201 Created (WorkerStatus)
+• GET     /worker-status/:id                   → Fetch status by ID                       → 200 OK (WorkerStatus)
+• DELETE  /worker-status/:id                   → Delete status by ID                      → 204 No Content
 
 == 🔍 Lookup & Search ==
-• GET     /worker-status/worker/:worker_id    → Find status by Worker ID                → 200 OK (Option<WorkerStatus>)
+• GET     /worker-status/worker/:worker_id     → Find status by Worker ID                → 200 OK (Option<WorkerStatus>)
 
 == 🔄 State Updates ==
-• PUT     /worker-status/:id/status           → Update overall status                   → 200 OK (WorkerStatus)
-• PUT     /worker-status/:id/last-heartbeat  → Update last heartbeat timestamp         → 200 OK (WorkerStatus)
-• PUT     /worker-status/:id/active-job-id    → Update active job ID                    → 200 OK (WorkerStatus)
-• PUT     /worker-status/:id/uptime           → Update uptime in seconds                → 200 OK (WorkerStatus)
-• PUT     /worker-status/:id/load-avg         → Update load average                     → 200 OK (WorkerStatus)
-• PUT     /worker-status/:id/last-error       → Update last error message               → 200 OK (WorkerStatus)
+• PUT     /worker-status/:id/status            → Update overall status                   → 200 OK (WorkerStatus)
+• PUT     /worker-status/:id/last-heartbeat   → Update last heartbeat timestamp         → 200 OK (WorkerStatus)
+• PUT     /worker-status/:id/active-job-id     → Update active job ID                    → 200 OK (WorkerStatus)
+• PUT     /worker-status/:id/uptime            → Update uptime in seconds                → 200 OK (WorkerStatus)
+• PUT     /worker-status/:id/load-avg          → Update load average                     → 200 OK (WorkerStatus)
+• PUT     /worker-status/:id/last-error        → Update last error message               → 200 OK (WorkerStatus)
 
 ======================================================================== */
+
 use chrono::Utc;
 use serde::Deserialize;
+
 // ===== CRUD =====
 #[post("/worker-status", format = "json", data = "<new_status>")]
 pub async fn create_worker_status(

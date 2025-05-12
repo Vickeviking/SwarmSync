@@ -1,7 +1,12 @@
+///! The dispatcher module, it hosts a UDP listener aswell as a sweeper
+///! By listening for UDP heartbeets it updates the state of the workers
+///! by sequentiall sweeping , it sees if a worker is unreachable and marks it as such
+///! after a pulse, it updates status to match recieved status
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use anyhow::{Context, Result};
 use chrono::Utc;
 use diesel_async::AsyncPgConnection;
 use tokio::net::UdpSocket;
@@ -9,7 +14,6 @@ use tokio::sync::{broadcast::Receiver, RwLock};
 
 use crate::core::shared_resources::SharedResources;
 use crate::modules::Logger;
-use anyhow::{Context, Result};
 use common::commands::load_db_connection;
 use common::database::models::worker::Worker;
 use common::database::repositories::{WorkerRepository, WorkerStatusRepository};
@@ -19,8 +23,11 @@ use common::enums::workers::WorkerStatusEnum;
 
 /// Shared state for dispatcher tasks
 struct DispatcherState {
+    // Maps worker_id to worker, loaded in during startup
     worker_map: RwLock<HashMap<i32, Worker>>,
+    // Maps worker_id to status | in-memory, used for sweeping
     status_map: RwLock<HashMap<i32, WorkerStatusEnum>>,
+    // Maps worker_id to last_seen
     last_seen: RwLock<HashMap<i32, Instant>>,
 }
 
@@ -35,6 +42,7 @@ impl DispatcherState {
     }
 }
 
+/// Dispatcher module
 pub struct Dispatcher {
     shared_resources: Arc<SharedResources>,
     core_event_rx: Receiver<CoreEvent>,
@@ -42,6 +50,7 @@ pub struct Dispatcher {
 }
 
 impl Dispatcher {
+    /// subscribe to core, to receive events after initialization
     pub fn new(shared_resources: Arc<SharedResources>) -> Self {
         Dispatcher {
             shared_resources: Arc::clone(&shared_resources),
@@ -52,6 +61,8 @@ impl Dispatcher {
         }
     }
 
+    /// Initialize the dispatcher init loop,
+    /// During startup UDP listener is spawned aswell as a sweeper
     pub async fn init(mut self) -> anyhow::Result<(), anyhow::Error> {
         loop {
             match self.core_event_rx.recv().await {

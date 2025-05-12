@@ -10,6 +10,7 @@ use diesel::serialize::ToSql;
 use diesel::sql_types::Text;
 use serde::{Deserialize, Serialize};
 
+/// The format of the downloaded image, how ashuold we extract it
 #[derive(AsExpression, FromSqlRow, Debug, Deserialize, Serialize, PartialEq)]
 #[diesel(sql_type = diesel::sql_types::VarChar)]
 pub enum ImageFormatEnum {
@@ -17,6 +18,7 @@ pub enum ImageFormatEnum {
     DockerRegistry,
 }
 
+// For logging aswell as serializing to json
 impl fmt::Display for ImageFormatEnum {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let label = match self {
@@ -27,6 +29,7 @@ impl fmt::Display for ImageFormatEnum {
     }
 }
 
+// deserialize from json
 impl FromStr for ImageFormatEnum {
     type Err = ();
 
@@ -39,6 +42,7 @@ impl FromStr for ImageFormatEnum {
     }
 }
 
+// deserialize from database
 impl FromSql<Text, Pg> for ImageFormatEnum {
     fn from_sql(value: PgValue<'_>) -> diesel::deserialize::Result<Self> {
         match value.as_bytes() {
@@ -49,6 +53,7 @@ impl FromSql<Text, Pg> for ImageFormatEnum {
     }
 }
 
+// serialize to database
 impl ToSql<Text, Pg> for ImageFormatEnum {
     fn to_sql<'b>(
         &'b self,

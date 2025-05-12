@@ -1,12 +1,10 @@
+use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
 use crate::database::models::job::{JobAssignment, NewJobAssignment};
-use crate::utils::mark_running;
-
 use crate::database::schema::*;
-
-use chrono::NaiveDateTime;
+use crate::utils::mark_running;
 
 pub struct JobAssignmentRepository;
 

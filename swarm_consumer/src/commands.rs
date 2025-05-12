@@ -347,3 +347,16 @@ pub async fn get_results_for_job(session: &Session, job_id: i32) -> anyhow::Resu
     }
     Ok(res.json().await?)
 }
+
+// TODO: write tests here
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A dummy test to ensure your test harness is working.
+    #[test]
+    fn dummy_test() {
+        // Replace this with real assertions as you go
+        assert_eq!(2 + 2, 4);
+    }
+}

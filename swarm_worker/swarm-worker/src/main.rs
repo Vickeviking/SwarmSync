@@ -146,6 +146,7 @@ async fn socket_listener(tx: broadcast::Sender<()>) -> Result<()> {
 
 struct Job(u64);
 
+/// Generates a random job or none
 async fn next_job() -> Option<Job> {
     if rand::thread_rng().gen_ratio(1, 20) {
         static mut C: u64 = 0;
@@ -160,4 +161,16 @@ async fn next_job() -> Option<Job> {
 
 async fn process(job: Job) {
     println!("processed job {}", job.0);
+}
+
+// TODO: write tests here
+#[cfg(test)]
+mod tests {
+
+    /// A dummy test to ensure your test harness is working.
+    #[test]
+    fn dummy_test() {
+        // Replace this with real assertions as you go
+        assert_eq!(2 + 2, 4);
+    }
 }

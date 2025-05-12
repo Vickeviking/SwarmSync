@@ -1,3 +1,4 @@
+///! Core API module, provides the core functionality of the swarm.
 pub mod module_initializer;
 pub mod pulse_broadcaster;
 pub mod service_initializer;

@@ -32,20 +32,20 @@ pub fn routes() -> Vec<Route> {
 
 == 🛠️ CRUD ==
 • GET     /users/:id                         → Fetch user by ID                       → 200 OK (User)
-• POST    /users                             → Create new user (NewUser)             → 201 Created (User)
+• POST    /users                             → Create new user (NewUserRequest)      → 201 Created (UserResponse)
 • DELETE  /users/:id                         → Delete user by ID                     → 204 No Content
-• PUT     /users/:id                         → Update user by ID                     → 200 OK (User)
+• PUT     /users/:id                         → Update user by ID (UpdateUserRequest) → 200 OK (UserResponse)
 
 == 🔍 Lookup ==
-• GET     /users/email/:email                → Find user by email                    → 200 OK (Option<User>)
+• GET     /users/email/:email                → Find user by email                    → 200 OK (User)
 • GET     /users/username/:username          → Find user by username                 → 200 OK (Option<User>)
 
 == 🔍 Search ==
-• GET     /users/search/username?q=:q        → Search users by username              → 200 OK (Vec<User>)
-• GET     /users/search/email?q=:q           → Search users by email                 → 200 OK (Vec<User>)
+• GET     /users/search/username?<q>         → Search users by username              → 200 OK (Vec<User>)
+• GET     /users/search/email?<q>            → Search users by email                 → 200 OK (Vec<User>)
 
 == 📑 Listing ==
-• GET     /users?page=:page&limit=:limit     → List all users (paginated)            → 200 OK (Vec<User>)
+• GET     /users?<page>&<limit>             → List all users (paginated)            → 200 OK (Vec<User>)
 
 == ⚡ Existence Checks ==
 • HEAD    /users/exists/email/:email         → Exists by email                       → 200 OK / 404 Not Found

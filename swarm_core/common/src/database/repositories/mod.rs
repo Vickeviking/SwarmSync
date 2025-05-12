@@ -1,3 +1,4 @@
+///! Repositories for database models
 pub mod job;
 pub mod job_assignment;
 pub mod job_metric;

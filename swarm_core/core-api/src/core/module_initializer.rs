@@ -1,10 +1,13 @@
+///! Module initializer, spawns all modules async.
+use std::sync::Arc;
+use tokio::task;
+
 use crate::core::shared_resources::SharedResources;
 use crate::modules::logger::Logger;
 use crate::modules::{Dispatcher, Harvester, Hibernator, Reciever, Scheduler, TaskArchive};
 use crate::rocket_api;
-use std::sync::Arc;
-use tokio::task;
 
+/// Holds tokio handles to all modules
 pub struct ModuleInitializer {
     pub dispatcher_task: task::JoinHandle<anyhow::Result<(), anyhow::Error>>,
     pub harvester_task: task::JoinHandle<()>,
@@ -17,6 +20,7 @@ pub struct ModuleInitializer {
 }
 
 impl ModuleInitializer {
+    // Create a new ModuleInitializer with a shared_resource
     pub fn new(shared_resources: Arc<SharedResources>) -> Self {
         let dispatcher = Dispatcher::new(Arc::clone(&shared_resources));
         let dispatcher_task = task::spawn(dispatcher.init());
@@ -39,6 +43,7 @@ impl ModuleInitializer {
         let task_archive = TaskArchive::new(Arc::clone(&shared_resources));
         let task_archive_task = task::spawn(task_archive.init());
 
+        // The rocket server
         let rocket_task = task::spawn(async move {
             rocket_api::rocket_server::launch_rocket(Arc::clone(&shared_resources)).await;
         });

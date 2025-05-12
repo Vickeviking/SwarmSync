@@ -1,3 +1,4 @@
+///! The harvester module
 use crate::core::shared_resources::SharedResources;
 use common::enums::system::CoreEvent;
 use std::sync::Arc;
