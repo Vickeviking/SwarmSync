@@ -1,14 +1,16 @@
+use anyhow::{Context, Result};
 use chrono::{NaiveDateTime, Utc};
+use diesel_async::AsyncPgConnection;
+use reqwest::{header, Client, ClientBuilder, StatusCode};
+use serde_json::json;
+use uuid::Uuid;
+
 use common::commands;
 use common::database::models::job::{Job, JobAssignment, JobMetric, JobResult};
 use common::database::models::user::{User, UserResponse};
 use common::database::models::worker::{Worker, WorkerStatus};
 use common::database::repositories::user::UserRepository;
 use common::database::repositories::{JobAssignmentRepository, JobRepository};
-use diesel_async::AsyncPgConnection;
-use reqwest::{header, Client, ClientBuilder, StatusCode};
-use serde_json::json;
-use uuid::Uuid;
 
 // ===== UTILITIES =====
 pub fn get_ndt_now() -> NaiveDateTime {

@@ -1,45 +1,7 @@
-/*
-===================== 🚀 Job API Overview =====================
-
-== 🛠️ CRUD ==
-• POST   /jobs                     -> Creates a new job (NewJob)           → 201 Created (Job)
-• GET    /jobs/:id                 -> Fetch job by ID                      → 200 OK (Job)
-• PATCH  /jobs/:id                 -> Update job by ID (Job)               → 200 OK (Job)
-• DELETE /jobs/:id                -> Delete job by ID                     → 204 No Content
-
-== 🔍 Lookup & Search ==
-• GET    /jobs/search?user_id&query         -> Fuzzy match jobs by name         → 200 OK (Vec<Job>)
-• GET    /jobs/name/:user_id?name           -> Exact match job by name          → 200 OK (Vec<Job>)
-• GET    /jobs/by_admin?user_id&limit&offset→ Jobs by a specific admin          → 200 OK (Vec<Job>)
-• GET    /jobs/state/:state                 -> Jobs by job state enum           → 200 OK (Vec<Job>)
-• GET    /jobs/recent?limit                 -> Most recent jobs (default 10)    → 200 OK (Vec<Job>)
-• GET    /jobs/failed?limit                 -> Recently failed jobs             → 200 OK (Vec<Job>)
-
-== 🔄 State Transitions ==
-• PATCH  /jobs/:id/running        -> Mark job as running                   → 200 OK (Job)
-• PATCH  /jobs/:id/succeeded      -> Mark job as succeeded                 → 200 OK (Job)
-• PATCH  /jobs/:id/failed         -> Mark job as failed (with message)     → 200 OK (Job)
-
-== ⏱️ Scheduling & Readiness ==
-• GET    /jobs/scheduled                   -> All jobs with a schedule          → 200 OK (Vec<Job>)
-• GET    /jobs/cron_due?date&time         -> Cron jobs due at a given time     → 200 OK (Vec<Job>)
-• GET    /jobs/ready                       -> One-time jobs ready to run        → 200 OK (Vec<Job>)
-
-== 📊 Aggregation & Stats ==
-• GET    /jobs/stats/admins                -> Job count grouped by admin ID     → 200 OK (Vec<(i32, i64)>)
-
-== 🤝 Assignment & Worker Routing ==
-• GET    /jobs/active/:worker_id           -> Active jobs for worker            → 200 OK (Vec<Job>)
-• GET    /jobs/assigned/:worker_id         -> Jobs assigned to worker           → 200 OK (Vec<Job>)
-• GET    /jobs/unassigned                  -> Jobs with no worker assignment    → 200 OK (Vec<Job>)
-
-===============================================================
-*/
-
-pub mod common_test;
-
-use common_test::enums::job::JobStateEnum;
 use rocket::serde::json::json;
+
+use common::enums::job::JobStateEnum;
+pub mod common_test;
 
 #[cfg(test)]
 mod job_api_tests {

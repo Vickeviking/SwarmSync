@@ -1,22 +1,3 @@
-/* ===================== ⚙️ JobAssignment API Overview =====================
-
-== 🛠️ CRUD ==
-• POST   /assignments                    → Create new assignment (NewJobAssignment) → 201 Created (JobAssignment)
-• GET    /assignments/:id               → Fetch assignment by ID → 200 OK (JobAssignment)
-• DELETE /assignments/:id               → Delete assignment by ID → 204 No Content
-
-== 🔍 Lookup & Search ==
-• GET /assignments/by_job/:job_id                  → Assignments by Job ID → 200 OK (Vec<JobAssignment>)
-• GET /assignments/by_worker/:worker_id            → Assignments by Worker ID → 200 OK (Vec<JobAssignment>)
-• GET /assignments/lookup/:job_id/:worker_id       → Assignment by Job + Worker → 200 OK (Option<JobAssignment>)
-• GET /assignments/by_worker/range?worker_id&start&end
-                                                  → Assignments in time range for worker → 200 OK (Vec<JobAssignment>)
-• GET /assignments/active                          → Currently active assignments → 200 OK (Vec<JobAssignment>)
-
-== 🔄 State Transitions ==
-• PATCH /assignments/:id/started   → Mark assignment as started (NaiveDateTime) → 200 OK (JobAssignment)
-• PATCH /assignments/:id/finished  → Mark assignment as finished (NaiveDateTime) → 200 OK (JobAssignment)
-======================================================================== */
 pub mod common_test;
 
 #[cfg(test)]
@@ -35,7 +16,7 @@ mod job_assignment_api_tests {
 
     #[tokio::test]
     async fn test_create_job_assignment() {
-        let (client, user, jobs, job_ids) = build_client_and_user_with_n_jobs(1).await;
+        let (client, user, jobs, _) = build_client_and_user_with_n_jobs(1).await;
         let job = &jobs[0];
         let worker = create_worker_via_api(&client, user.id).await;
 

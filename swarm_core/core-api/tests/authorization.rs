@@ -1,8 +1,7 @@
-use common_test::{APP_HOST, TEST_PASSWORD};
 use reqwest::{header, StatusCode};
-use swarmsync_core::database::models::user::UserResponse;
 
-use tokio;
+use common::database::models::user::UserResponse;
+use common_test::{APP_HOST, TEST_PASSWORD};
 
 pub mod common_test;
 

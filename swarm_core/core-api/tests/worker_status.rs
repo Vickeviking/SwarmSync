@@ -1,40 +1,15 @@
-/* ===================== ⚙️ WorkerStatus API Overview =====================
-
-== 🛠️ CRUD ==
-• POST    /worker-status                      → Create new status (NewWorkerStatus)     → 201 Created (WorkerStatus)
-• GET     /worker-status/:id                  → Fetch status by ID                       → 200 OK (WorkerStatus)
-• DELETE  /worker-status/:id                  → Delete status by ID                      → 204 No Content
-
-== 🔍 Lookup & Search ==
-• GET     /worker-status/worker/:worker_id    → Find status by Worker ID                → 200 OK (Option<WorkerStatus>)
-
-== 🔄 State Updates ==
-• PUT     /worker-status/:id/status           → Update overall status                   → 200 OK (WorkerStatus)
-• PUT     /worker-status/:id/last-heartbeat  → Update last heartbeat timestamp         → 200 OK (WorkerStatus)
-• PUT     /worker-status/:id/active-job-id    → Update active job ID                    → 200 OK (WorkerStatus)
-• PUT     /worker-status/:id/uptime           → Update uptime in seconds                → 200 OK (WorkerStatus)
-• PUT     /worker-status/:id/load-avg         → Update load average                     → 200 OK (WorkerStatus)
-• PUT     /worker-status/:id/last-error       → Update last error message               → 200 OK (WorkerStatus)
-
-======================================================================== */
 pub mod common_test;
 #[cfg(test)]
 mod worker_status_api_tests {
 
     use crate::common_test::{
-        assign_job_to_worker, assign_result_to_job, build_client_and_user_with_n_jobs,
-        build_client_with_logged_in_admin, create_metric_via_api, create_worker_status_via_api,
-        create_worker_via_api, delete_job_via_api, delete_jobs_via_api, delete_user_via_api,
-        delete_worker_via_api, get_ndt_now, mark_assignment_finished_via_api, APP_HOST,
+        build_client_and_user_with_n_jobs, build_client_with_logged_in_admin,
+        create_worker_status_via_api, create_worker_via_api, delete_jobs_via_api,
+        delete_user_via_api, delete_worker_via_api, get_ndt_now, APP_HOST,
     };
-    use chrono::Utc;
+    use common::database::models::worker::WorkerStatus;
     use reqwest::StatusCode;
-    use rocket::http::Status;
     use rocket::serde::json::json;
-    use swarmsync_core::database::models::worker::WorkerStatus;
-    use swarmsync_core::shared::enums::workers::WorkerStatusEnum;
-    use tokio::time::{sleep, Duration};
-    use uuid::Uuid;
 
     // 🚀 CRUD Endpoints
 

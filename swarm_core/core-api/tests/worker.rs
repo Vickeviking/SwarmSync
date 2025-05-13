@@ -1,36 +1,18 @@
-/* ===================== ⚙️ Worker API Overview =====================
+use chrono::Utc;
+use rocket::serde::json::json;
+use tokio::time::{sleep, Duration};
+use uuid::Uuid;
 
-== 🛠️ CRUD ==
-• POST    /workers                           → Create new worker (NewWorker)      → 201 Created (Worker)
-• GET     /workers/:id                       → Fetch worker by ID                 → 200 OK (Worker)
-• DELETE  /workers/:id                       → Delete worker by ID                → 204 No Content
-
-== 🔍 Lookup & Search ==
-• GET     /workers/admin/:admin_id           → Workers by Admin ID                → 200 OK (Vec<Worker>)
-• GET     /workers/label/:label              → Find worker by label               → 200 OK (Option<Worker>)
-• GET     /workers/ip/:ip_address            → Find worker by IP address          → 200 OK (Option<Worker>)
-• GET     /workers/admin/:admin_id/list      → List workers by Admin (paginated)  → 200 OK (Vec<Worker>)
-
-== 🔄 State Update ==
-• PUT     /workers/:id/last-seen             → Update last-seen timestamp         → 200 OK (Worker)
-
-======================================================================== */
+use common::database::models::worker::Worker;
 
 pub mod common_test;
 #[cfg(test)]
 mod worker_api_tests {
 
     use crate::common_test::{
-        assign_job_to_worker, assign_result_to_job, build_client_and_user_with_n_jobs,
-        build_client_with_logged_in_admin, create_metric_via_api, create_worker_via_api,
-        delete_job_via_api, delete_jobs_via_api, delete_user_via_api, delete_worker_via_api,
-        get_ndt_now, mark_assignment_finished_via_api, APP_HOST,
+        build_client_with_logged_in_admin, create_worker_via_api, delete_user_via_api,
+        delete_worker_via_api, APP_HOST,
     };
-    use chrono::Utc;
-    use rocket::serde::json::json;
-    use swarmsync_core::database::models::worker::Worker;
-    use tokio::time::{sleep, Duration};
-    use uuid::Uuid;
 
     #[tokio::test]
     async fn test_create_worker() {

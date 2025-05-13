@@ -1,34 +1,13 @@
-/* ===================== ⚙️ JobResult API Overview =====================
-
-== 🛠️ CRUD ==
-• POST    /results                   → Create new result (NewJobResult)         → 201 Created (JobResult)
-• GET     /results/:id               → Fetch result by ID                       → 200 OK (JobResult)
-• DELETE  /results/:id               → Delete result by ID                      → 204 No Content
-
-== 🔍 Lookup & Search ==
-• GET     /results/job/:job_id       → Results by Job ID                        → 200 OK (Vec<JobResult>)
-• GET     /results/list/:job_id      → List results for Job                     → 200 OK (Vec<JobResult>)
-• GET     /results/recent/:job_id    → Most recent result for Job               → 200 OK (Option<JobResult>)
-
-== 🔄 Field Updates ==
-• PATCH   /results/:id/stdout        → Update stdout field                      → 200 OK (JobResult)
-• PATCH   /results/:id/files         → Update files field                       → 200 OK (JobResult)
-
-======================================================================== */
 pub mod common_test;
 
 #[cfg(test)]
 mod job_result_api_tests {
     use crate::common_test::{
-        assign_job_to_worker, assign_result_to_job, build_client_and_user_with_n_jobs,
-        create_metric_via_api, create_worker_via_api, delete_job_via_api, delete_jobs_via_api,
-        delete_user_via_api, delete_worker_via_api, get_ndt_now, mark_assignment_finished_via_api,
-        APP_HOST,
+        assign_result_to_job, build_client_and_user_with_n_jobs, delete_job_via_api,
+        delete_user_via_api, APP_HOST,
     };
-    use chrono::Utc;
     use common::database::models::job::JobResult;
     use rocket::serde::json::json;
-    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     async fn test_create_job_result() {

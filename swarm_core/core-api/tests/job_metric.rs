@@ -1,17 +1,3 @@
-/* ===================== ⚙️ JobMetric API Overview =====================
-
-== 🛠️ CRUD ==
-• POST   /metrics                             → Create new metric (NewJobMetric) → 201 Created (JobMetric)
-• GET    /metrics/:id                         → Fetch metric by ID             → 200 OK (JobMetric)
-• DELETE /metrics/:id                         → Delete metric by ID            → 204 No Content
-
-== 🔍 Lookup & Search ==
-• GET    /metrics/by_job/:job_id              → Metrics by Job ID              → 200 OK (Vec<JobMetric>)
-• GET    /metrics/by_worker/:worker_id        → Metrics by Worker ID           → 200 OK (Vec<JobMetric>)
-• GET    /metrics/recent/:job_id              → Most recent metric for Job     → 200 OK (Option<JobMetric>)
-• GET    /metrics/worker_stream/:worker_id    → Worker metric stream           → 200 OK (Vec<JobMetric>)
-
-======================================================================== */
 pub mod common_test;
 
 #[cfg(test)]
@@ -19,9 +5,8 @@ mod job_metric_api_tests {
     use crate::common_test::{
         assign_job_to_worker, build_client_and_user_with_n_jobs, create_metric_via_api,
         create_worker_via_api, delete_job_via_api, delete_jobs_via_api, delete_user_via_api,
-        delete_worker_via_api, get_ndt_now, mark_assignment_finished_via_api, APP_HOST,
+        delete_worker_via_api, APP_HOST,
     };
-    use chrono::Utc;
     use common::database::models::job::JobMetric;
     use rocket::serde::json::json;
     use tokio::time::{sleep, Duration};
