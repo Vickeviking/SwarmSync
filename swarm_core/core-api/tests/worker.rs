@@ -1,6 +1,5 @@
 use chrono::Utc;
 use rocket::serde::json::json;
-use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 
 use common::database::models::worker::Worker;
@@ -8,6 +7,8 @@ use common::database::models::worker::Worker;
 pub mod common_test;
 #[cfg(test)]
 mod worker_api_tests {
+
+    use super::*;
 
     use crate::common_test::{
         build_client_with_logged_in_admin, create_worker_via_api, delete_user_via_api,

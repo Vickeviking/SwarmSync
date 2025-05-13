@@ -6,14 +6,14 @@ use common_test::{APP_HOST, TEST_PASSWORD};
 pub mod common_test;
 
 #[tokio::test]
-async fn test_login() {
+async fn test_login() -> anyhow::Result<()> {
     // 1) Setup: unique username + shared client + create user
     let username = common_test::generate_unique_username();
     let client = common_test::http_client();
-    let user: UserResponse = common_test::create_user_via_api(&client, &username).await;
+    let user: UserResponse = common_test::create_user_via_api(&client, &username).await?;
 
     // 2) Login: correct password
-    let resp = common_test::login_user(&client, &username, TEST_PASSWORD).await;
+    let resp = common_test::login_user(&client, &username, TEST_PASSWORD).await?;
     assert_eq!(resp.status(), StatusCode::OK);
 
     let body: serde_json::Value = resp.json().await.unwrap();
@@ -21,7 +21,7 @@ async fn test_login() {
     assert_eq!(token.len(), 128);
 
     // 3) Login: incorrect password
-    let resp = common_test::login_user(&client, &username, "wrong_password").await;
+    let resp = common_test::login_user(&client, &username, "wrong_password").await?;
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 
     // 4) Access protected route without token → expect failure
@@ -57,5 +57,6 @@ async fn test_login() {
     assert_eq!(fetched_user.username, username);
 
     // 7) Cleanup: delete user using authorized client
-    common_test::delete_user_via_api(&authorized_client, user.id).await;
+    common_test::delete_user_via_api(&authorized_client, user.id).await?;
+    Ok(())
 }

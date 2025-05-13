@@ -220,7 +220,11 @@ mod job_assignment_api_tests {
         let a2: JobAssignment = assign_job_to_worker(&client, job2.id, worker.id).await;
 
         // mark a1 finished
-        mark_assignment_finished_via_api(&client, a1.id, get_ndt_now()).await;
+        assert!(
+            mark_assignment_finished_via_api(&client, a1.id, get_ndt_now())
+                .await
+                .is_ok()
+        );
 
         let url = format!("{}/assignments/active", APP_HOST);
         let res = client.get(&url).send().await.expect("Active lookup failed");

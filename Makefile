@@ -109,28 +109,28 @@ rebuild-worker: ## Rebuild swarm-worker (no cache) & restart
 test-unit: ## Run unit tests in Core, Consumer & Worker
 	$(require_core)
 	@echo "▶ Core unit tests…"
-	@$(DC) exec $(CORE)        cargo test -- --nocapture
+	@$(DC) exec $(CORE)        cargo test -- --include-ignored
 	@echo "▶ Consumer unit tests…"
-	@$(DC) exec $(CONSUMER)    cargo test -- --nocapture
+	@$(DC) exec $(CONSUMER)    cargo test -- --include-ignored
 	@echo "▶ Worker unit tests…"
-	@$(DC) exec $(WORKER)      cargo test -- --nocapture
+	@$(DC) exec $(WORKER)      cargo test -- --include-ignored
 
 test-integration: up-all migrate ## Run integration tests for every crate (host-side)
 	$(require_core)
 	@echo "▶ Core-API integration tests…"
-	@cd swarm_core/core-api       && cargo test -- --ignored
+	@cd swarm_core/core-api       && cargo test -- --include-ignored
 
 	@echo "▶ CommandDeck integration tests…"
-	@cd swarm_core/commanddeck    && cargo test -- --ignored
+	@cd swarm_core/commanddeck    && cargo test -- --include-ignored
 
 	@echo "▶ Consumer integration tests…"
-	@cd swarm_consumer            && cargo test -- --ignored
+	@cd swarm_consumer            && cargo -- --include-ignored
 
 	@echo "▶ Swarm-Worker binary integration tests…"
-	@cd swarm_worker/swarm-worker         && cargo test -- --ignored
+	@cd swarm_worker/swarm-worker         && cargo test -- --include-ignored
 
 	@echo "▶ Swarm-Worker-TUI integration tests…"
-	@cd swarm_worker/swarm-worker-tui     && cargo test -- --ignored
+	@cd swarm_worker/swarm-worker-tui     && cargo test -- --include-ignored
 
 test-all: test-unit test-integration ## Run all tests
 

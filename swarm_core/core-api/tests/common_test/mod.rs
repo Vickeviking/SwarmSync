@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, ensure, Context};
 use chrono::{NaiveDateTime, Utc};
 use diesel_async::AsyncPgConnection;
 use reqwest::{header, Client, ClientBuilder, StatusCode};
@@ -7,9 +7,8 @@ use uuid::Uuid;
 
 use common::commands;
 use common::database::models::job::{Job, JobAssignment, JobMetric, JobResult};
-use common::database::models::user::{User, UserResponse};
+use common::database::models::user::UserResponse;
 use common::database::models::worker::{Worker, WorkerStatus};
-use common::database::repositories::user::UserRepository;
 use common::database::repositories::{JobAssignmentRepository, JobRepository};
 
 // ===== UTILITIES =====
@@ -33,7 +32,10 @@ pub fn generate_unique_username() -> String {
 }
 
 /// Create a user via the HTTP API
-pub async fn create_user_via_api(client: &Client, username: &str) -> UserResponse {
+pub async fn create_user_via_api(
+    client: &Client,
+    username: &str,
+) -> anyhow::Result<UserResponse, anyhow::Error> {
     let email = format!("{}@example.com", username);
     let res = client
         .post(&format!("{}/users", APP_HOST))
@@ -44,7 +46,7 @@ pub async fn create_user_via_api(client: &Client, username: &str) -> UserRespons
         }))
         .send()
         .await
-        .expect("Failed to send create-user request");
+        .context("Failed to send create-user request")?;
 
     assert!(
         res.status().is_success(),
@@ -53,65 +55,67 @@ pub async fn create_user_via_api(client: &Client, username: &str) -> UserRespons
         res.text().await.unwrap_or_default()
     );
 
-    res.json::<UserResponse>()
+    let user_resp = res
+        .json::<UserResponse>()
         .await
-        .expect("Failed to deserialize User from create response")
-}
+        .context("Failed to deserialize User from create response")?;
 
-/// Fetch full user model directly from the database
-pub async fn get_full_user_model(user_id: i32) -> User {
-    let mut conn: AsyncPgConnection = commands::load_db_connection().await;
-    UserRepository::find_by_id(&mut conn, user_id)
-        .await
-        .expect("Failed to fetch user by ID")
+    Ok(user_resp)
 }
 
 /// Attempt login via HTTP API, returning the response
-pub async fn login_user(client: &Client, username: &str, password: &str) -> reqwest::Response {
-    client
+pub async fn login_user(
+    client: &Client,
+    username: &str,
+    password: &str,
+) -> anyhow::Result<reqwest::Response, anyhow::Error> {
+    let resp = client
         .post(&format!("{}/login", APP_HOST))
         .json(&json!({ "username": username, "password": password }))
         .send()
         .await
-        .expect("Login request failed")
+        .context("Login request failed")?;
+
+    Ok(resp)
 }
 
 /// Returns a logged-in client and the corresponding user
-pub async fn build_client_with_logged_in_admin() -> (Client, UserResponse) {
+pub async fn build_client_with_logged_in_admin(
+) -> anyhow::Result<(Client, UserResponse), anyhow::Error> {
     let client = http_client();
 
     let username = generate_unique_username();
-    let user = create_user_via_api(&client, &username).await;
+    let user = create_user_via_api(&client, &username)
+        .await
+        .context("Failed to create user with api")?;
 
-    let login_resp = login_user(&client, &username, TEST_PASSWORD).await;
-    assert_eq!(login_resp.status(), StatusCode::OK);
+    let login_resp = login_user(&client, &username, TEST_PASSWORD).await?;
+
+    ensure!(login_resp.status() == StatusCode::OK,);
 
     let token = login_resp.json::<serde_json::Value>().await.unwrap()["token"]
         .as_str()
-        .unwrap()
+        .ok_or_else(|| anyhow!("could not extract login token"))?
         .to_string();
 
     let mut headers = header::HeaderMap::new();
     headers.insert(
         header::AUTHORIZATION,
-        header::HeaderValue::from_str(&format!("Bearer {}", token)).unwrap(),
+        header::HeaderValue::from_str(&format!("Bearer {}", token)).context("invalid tokens")?,
     );
 
-    let authorized_client = ClientBuilder::new()
-        .default_headers(headers)
-        .build()
-        .unwrap();
+    let authorized_client = ClientBuilder::new().default_headers(headers).build()?;
 
-    (authorized_client, user)
+    Ok((authorized_client, user))
 }
 
 /// Delete user via API by ID
-pub async fn delete_user_via_api(client: &Client, id: i32) {
+pub async fn delete_user_via_api(client: &Client, id: i32) -> anyhow::Result<(), anyhow::Error> {
     let res = client
         .delete(&format!("{}/users/{}", APP_HOST, id))
         .send()
         .await
-        .expect("Delete-user request failed");
+        .context("Delete-user request failed")?;
 
     assert!(
         res.status().is_success() || res.status() == StatusCode::NO_CONTENT,
@@ -119,13 +123,22 @@ pub async fn delete_user_via_api(client: &Client, id: i32) {
         res.status(),
         res.text().await.unwrap_or_default()
     );
+
+    Ok(())
 }
 
 /// Delete multiple users
-pub async fn delete_users_via_api(client: &Client, user_ids: &[i32]) {
+pub async fn delete_users_via_api(
+    client: &Client,
+    user_ids: &[i32],
+) -> anyhow::Result<(), anyhow::Error> {
     for &id in user_ids {
-        delete_user_via_api(client, id).await;
+        delete_user_via_api(client, id)
+            .await
+            .context("Failed to delete user via api")?;
     }
+
+    Ok(())
 }
 
 // ========== Job Utilities ==========
@@ -137,8 +150,8 @@ pub fn generate_unique_job_name() -> String {
 /// Create `n` jobs and return client, user, jobs, job_ids
 pub async fn build_client_and_user_with_n_jobs(
     n: usize,
-) -> (Client, UserResponse, Vec<Job>, Vec<i32>) {
-    let (client, user) = build_client_with_logged_in_admin().await;
+) -> anyhow::Result<(Client, UserResponse, Vec<Job>, Vec<i32>), anyhow::Error> {
+    let (client, user) = build_client_with_logged_in_admin().await?;
     let mut jobs = Vec::with_capacity(n);
     let mut job_ids = Vec::with_capacity(n);
 
@@ -162,7 +175,7 @@ pub async fn build_client_and_user_with_n_jobs(
             .json(&payload)
             .send()
             .await
-            .expect("Job creation request failed");
+            .context("Job creation request failed")?;
 
         assert_eq!(resp.status(), StatusCode::CREATED);
 
@@ -171,33 +184,53 @@ pub async fn build_client_and_user_with_n_jobs(
         jobs.push(job);
     }
 
-    (client, user, jobs, job_ids)
+    Ok((client, user, jobs, job_ids))
 }
 
 /// Delete a job by ID
-pub async fn delete_job_via_api(client: &Client, job_id: i32) {
+pub async fn delete_job_via_api(client: &Client, job_id: i32) -> anyhow::Result<(), anyhow::Error> {
     let resp = client
         .delete(&format!("{}/jobs/{}", APP_HOST, job_id))
         .send()
         .await
-        .expect("Failed to delete job");
+        .context("Failed to delete job")?;
 
     assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+
+    Ok(())
 }
 
 /// Delete multiple jobs
-pub async fn delete_jobs_via_api(client: &Client, job_ids: &[i32]) {
+pub async fn delete_jobs_via_api(
+    client: &Client,
+    job_ids: &[i32],
+) -> anyhow::Result<(), anyhow::Error> {
     for &id in job_ids {
-        delete_job_via_api(client, id).await;
+        delete_job_via_api(client, id).await?;
     }
+    Ok(())
 }
 
-pub async fn mark_job_running(client: &Client, job_id: i32) {
+/// Mark a job as running, use pg connection and bypass rocket routes
+/// # Arguments
+/// * `job_id` - The ID of the job to mark as running
+/// * `client` - The client, must be logged in
+/// # Returns
+/// * `anyhow::Result<(), anyhow::Error>`
+/// # Example
+/// ```
+/// let client = build_client_with_logged_in_admin().await;
+/// mark_job_running(&client, 1).await;
+/// ```
+pub async fn mark_job_running(client: &Client, job_id: i32) -> anyhow::Result<(), anyhow::Error> {
     //get job
-    let mut conn: AsyncPgConnection = commands::load_db_connection().await;
+    let mut conn: AsyncPgConnection = commands::load_db_connection()
+        .await
+        .context("Failed to load db connection")?;
+
     let job: Job = JobRepository::find_by_id(&mut conn, job_id)
         .await
-        .expect("Could not find job through id in db");
+        .context("Could not find job through id in db")?;
 
     let updated_payload = serde_json::json!({
         "id": job_id,
@@ -216,20 +249,35 @@ pub async fn mark_job_running(client: &Client, job_id: i32) {
         "updated_at": Utc::now().naive_utc(),
     });
 
-    let response = client
+    let _ = client
         .patch(format!("{}/jobs/{job_id}", APP_HOST))
         .json(&updated_payload)
         .send()
         .await
-        .expect("Failed to mark job complete");
+        .context("Failed to mark job complete")?;
+
+    Ok(())
 }
 
-pub async fn mark_job_failed(client: &Client, job_id: i32) {
+/// Mark a job as failed through direct postgres API call bypassing rocket routes
+/// # Arguments
+/// * `job_id` - The ID of the job
+/// * `client` - The client, must be logged in
+/// # Returns
+/// * `anyhow::Result<(), anyhow::Error>`
+/// # Example
+/// ```
+/// let client = build_client_with_logged_in_admin().await;
+/// mark_job_failed(&client, 1).await;
+/// ```
+pub async fn mark_job_failed(client: &Client, job_id: i32) -> anyhow::Result<(), anyhow::Error> {
     //get job
-    let mut conn: AsyncPgConnection = commands::load_db_connection().await;
+    let mut conn: AsyncPgConnection = commands::load_db_connection()
+        .await
+        .context("Failed to load db connection")?;
     let job: Job = JobRepository::find_by_id(&mut conn, job_id)
         .await
-        .expect("Could not find job through id in db");
+        .context("Could not find job through id in db")?;
 
     let updated_payload = serde_json::json!({
         "id": job_id,
@@ -248,26 +296,41 @@ pub async fn mark_job_failed(client: &Client, job_id: i32) {
         "updated_at": Utc::now().naive_utc(),
     });
 
-    let response = client
+    let _ = client
         .patch(format!("{}/jobs/{job_id}", APP_HOST))
         .json(&updated_payload)
         .send()
         .await
-        .expect("Failed to mark job complete");
+        .context("Failed to mark job complete")?;
+
+    Ok(())
 }
 
-// Job assignment
-/// Mark a job assignment as started via API
+/// Mark an assignment as started via the API, bypassing rocket routes
+/// # Arguments
+/// * `client` - The client, must be logged in
+/// * `assignment_id` - The ID of the assignment
+/// * `started_at` - The time the assignment was started
+/// # Returns
+/// * `anyhow::Result<(), anyhow::Error>`
+/// # Example
+/// ```
+/// let client = build_client_with_logged_in_admin().await;
+/// let dt = Utc::now().naive_utc();
+/// mark_assignment_started_via_api(&client, 1, dt).await;
+/// ```
 pub async fn mark_assignment_started_via_api(
     client: &Client,
     assignment_id: i32,
     started_at: NaiveDateTime,
-) {
+) -> anyhow::Result<(), anyhow::Error> {
     // Fetch the assignment details
-    let mut conn: AsyncPgConnection = commands::load_db_connection().await;
+    let mut conn: AsyncPgConnection = commands::load_db_connection()
+        .await
+        .context("Failed to load db connection")?;
     let assignment: JobAssignment = JobAssignmentRepository::find_by_id(&mut conn, assignment_id)
         .await
-        .expect("Could not find assignment by id");
+        .context("Could not find assignment by id")?;
 
     // Construct the payload to update the assignment
     let updated_payload = json!({
@@ -288,10 +351,12 @@ pub async fn mark_assignment_started_via_api(
         .json(&updated_payload)
         .send()
         .await
-        .expect("Failed to mark assignment started");
+        .context("Failed to mark assignment started")?;
 
     // Assert that the request was successful
     assert_eq!(resp.status(), StatusCode::OK);
+
+    Ok(())
 }
 
 /// Mark a job assignment as finished via API
@@ -299,12 +364,14 @@ pub async fn mark_assignment_finished_via_api(
     client: &Client,
     assignment_id: i32,
     finished_at: NaiveDateTime,
-) {
+) -> anyhow::Result<(), anyhow::Error> {
     // Fetch the assignment details
-    let mut conn: AsyncPgConnection = commands::load_db_connection().await;
+    let mut conn: AsyncPgConnection = commands::load_db_connection()
+        .await
+        .context("Failed to load db connection")?;
     let assignment: JobAssignment = JobAssignmentRepository::find_by_id(&mut conn, assignment_id)
         .await
-        .expect("Could not find assignment by id");
+        .context("Could not find assignment by id")?;
 
     // Construct the payload to update the assignment
     let updated_payload = json!({
@@ -325,10 +392,12 @@ pub async fn mark_assignment_finished_via_api(
         .json(&updated_payload)
         .send()
         .await
-        .expect("Failed to mark assignment finished");
+        .context("Failed to mark assignment finished")?;
 
     // Assert that the request was successful
     assert_eq!(resp.status(), StatusCode::OK);
+
+    Ok(())
 }
 
 // Metrics
@@ -340,7 +409,7 @@ pub async fn create_metric_via_api(
     cpu_usage_pct: f32,
     mem_usage_mb: f32,
     exit_code: i32,
-) -> JobMetric {
+) -> anyhow::Result<JobMetric, anyhow::Error> {
     let payload = json!({
         "job_id": job_id,
         "worker_id": worker_id,
@@ -355,7 +424,7 @@ pub async fn create_metric_via_api(
         .json(&payload)
         .send()
         .await
-        .expect("Failed to send create-metric request");
+        .context("Failed to send create-metric request")?;
 
     assert!(
         res.status().is_success(),
@@ -364,13 +433,19 @@ pub async fn create_metric_via_api(
         res.text().await.unwrap_or_default()
     );
 
-    res.json::<JobMetric>()
+    let job_metric = res
+        .json::<JobMetric>()
         .await
-        .expect("Failed to deserialize JobMetric from create response")
+        .context("Failed to deserialize JobMetric from create response")?;
+
+    Ok(job_metric)
 }
 
 // JOb result
-pub async fn assign_result_to_job(client: &Client, job_id: i32) -> JobResult {
+pub async fn assign_result_to_job(
+    client: &Client,
+    job_id: i32,
+) -> anyhow::Result<JobResult, anyhow::Error> {
     let payload = json!({
         "job_id": job_id,
         "stdout": Some("Execution finished successfully."),
@@ -385,7 +460,7 @@ pub async fn assign_result_to_job(client: &Client, job_id: i32) -> JobResult {
         .json(&payload)
         .send()
         .await
-        .expect("Failed to send POST /results");
+        .context("Failed to send POST /results")?;
 
     assert!(
         res.status().is_success(),
@@ -394,13 +469,19 @@ pub async fn assign_result_to_job(client: &Client, job_id: i32) -> JobResult {
         res.text().await.unwrap_or_default()
     );
 
-    res.json::<JobResult>()
+    let job_result = res
+        .json::<JobResult>()
         .await
-        .expect("Failed to deserialize JobResult")
+        .context("Failed to deserialize JobResult")?;
+
+    Ok(job_result)
 }
 
 // ======== Worker Utilities ==========
-pub async fn create_worker_via_api(client: &Client, user_id: i32) -> Worker {
+pub async fn create_worker_via_api(
+    client: &Client,
+    user_id: i32,
+) -> anyhow::Result<Worker, anyhow::Error> {
     let label = format!("worker-{}", Uuid::new_v4());
     let res = client
         .post(&format!("{}/workers", APP_HOST))
@@ -418,7 +499,7 @@ pub async fn create_worker_via_api(client: &Client, user_id: i32) -> Worker {
         }))
         .send()
         .await
-        .expect("Failed to send create-worker request");
+        .context("Failed to send create-worker request")?;
 
     assert!(
         res.status().is_success(),
@@ -427,12 +508,19 @@ pub async fn create_worker_via_api(client: &Client, user_id: i32) -> Worker {
         res.text().await.unwrap_or_default()
     );
 
-    res.json::<Worker>()
+    let worker = res
+        .json::<Worker>()
         .await
-        .expect("Failed to deserialize Worker from create response")
+        .context("Failed to deserialize Worker from create response")?;
+
+    Ok(worker)
 }
 
-pub async fn assign_job_to_worker(client: &Client, job_id: i32, worker_id: i32) -> JobAssignment {
+pub async fn assign_job_to_worker(
+    client: &Client,
+    job_id: i32,
+    worker_id: i32,
+) -> anyhow::Result<JobAssignment, anyhow::Error> {
     let res = client
         .post(&format!("{}/assignments", APP_HOST))
         .json(&json!({
@@ -441,7 +529,7 @@ pub async fn assign_job_to_worker(client: &Client, job_id: i32, worker_id: i32) 
         }))
         .send()
         .await
-        .expect("Failed to send create-assignment request");
+        .context("Failed to send create-assignment request")?;
 
     assert!(
         res.status().is_success(),
@@ -450,17 +538,23 @@ pub async fn assign_job_to_worker(client: &Client, job_id: i32, worker_id: i32) 
         res.text().await.unwrap_or_default()
     );
 
-    res.json::<JobAssignment>()
+    let job_assignment = res
+        .json::<JobAssignment>()
         .await
-        .expect("Failed to deserialize JobAssignment from response")
+        .context("Failed to deserialize JobAssignment from response")?;
+
+    Ok(job_assignment)
 }
 
-pub async fn delete_worker_via_api(client: &Client, worker_id: i32) {
+pub async fn delete_worker_via_api(
+    client: &Client,
+    worker_id: i32,
+) -> anyhow::Result<(), anyhow::Error> {
     let res = client
         .delete(&format!("{}/workers/{}", APP_HOST, worker_id))
         .send()
         .await
-        .expect("Failed to send DELETE /workers/:id request");
+        .context("Failed to send DELETE /workers/:id request")?;
 
     assert!(
         res.status().is_success(),
@@ -468,13 +562,15 @@ pub async fn delete_worker_via_api(client: &Client, worker_id: i32) {
         res.status(),
         res.text().await.unwrap_or_default()
     );
+
+    Ok(())
 }
 
 pub async fn create_worker_status_via_api(
     client: &Client,
     worker_id: i32,
     job_id: Option<i32>,
-) -> WorkerStatus {
+) -> anyhow::Result<WorkerStatus, anyhow::Error> {
     let status_data = json!({
         "worker_id": worker_id,
         "status": "Idle",
@@ -490,11 +586,14 @@ pub async fn create_worker_status_via_api(
         .json(&status_data)
         .send()
         .await
-        .expect("Failed to send request to create worker status");
+        .context("Failed to send request to create worker status")?;
 
-    assert_eq!(res.status(), StatusCode::CREATED, "Expected 201 Created");
+    ensure!(res.status() == StatusCode::CREATED,);
 
-    res.json::<WorkerStatus>()
+    let worker_status = res
+        .json::<WorkerStatus>()
         .await
-        .expect("Failed to parse created WorkerStatus")
+        .context("Failed to parse created WorkerStatus")?;
+
+    Ok(worker_status)
 }
